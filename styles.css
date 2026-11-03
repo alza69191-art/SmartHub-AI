@@ -296,3 +296,20 @@ main,footer{margin-right:0}
 .minimal-composer button{flex:0 0 42px;width:42px;height:42px;border:0;border-radius:13px;background:linear-gradient(135deg,#a77bff,#7041c2);color:white;font-size:25px;line-height:1}
 .minimal-composer button:disabled{opacity:.55;cursor:wait}
 @media(max-width:600px){.minimal-assistant{padding:12px 10px}.minimal-message{max-width:94%}.minimal-composer{padding:9px}.minimal-composer textarea{font-size:15px}}
+
+
+/* Plain assistant interface */
+.assistant-minimal{background:#fff;color:#222}
+.minimal-assistant{width:min(820px,100%);padding:18px 18px 14px;gap:10px}
+.minimal-replies{gap:12px;padding:8px 2px}
+.minimal-message{max-width:85%;padding:8px 0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.minimal-message.user{background:transparent;border:0}
+.minimal-message p{color:#222;font-size:15px;line-height:1.7}
+.minimal-message.user p{color:#2457a6}
+.minimal-message.typing p{color:#777}
+.minimal-composer{gap:8px;padding:8px 0;border:0;border-top:1px solid #ddd;border-radius:0;background:transparent;box-shadow:none}
+.minimal-composer:focus-within{border-color:#aaa;box-shadow:none}
+.minimal-composer textarea{color:#222;font-size:15px}
+.minimal-composer textarea::placeholder{color:#888}
+.minimal-composer button{background:#222;border-radius:6px;font-size:14px}
+@media(max-width:600px){.minimal-assistant{padding:10px}.minimal-message{max-width:96%}}
