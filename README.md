@@ -35,3 +35,12 @@ The FastAPI backend lives in `api/`. The `render.yaml` file defines a Render web
 5. Redeploy the static GitHub Pages site if required.
 
 The chat uses the server-side Groq client and the `llama-3.3-70b-versatile` model. Configure `FRONTEND_ORIGIN` to your exact GitHub Pages origin before public launch.
+
+
+## PostgreSQL on Render
+
+The API connects to a Render PostgreSQL database using the server-side DATABASE_URL environment variable. Add the Internal Database URL to the smarthub-ai-api service in Render → Environment. Never commit database credentials to GitHub or expose them in browser JavaScript.
+
+On startup, the API creates the initial profiles, support_tickets, and support_replies tables and their indexes if they do not already exist. The /health response reports whether PostgreSQL is reachable.
+
+This schema is groundwork only: authentication, authorization, and protected support-ticket endpoints must be implemented before exposing the tables to users. Admin roles must only be assigned through a trusted server-side process.
