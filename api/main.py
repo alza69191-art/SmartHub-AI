@@ -1,5 +1,17 @@
 import logging
 import os
+import re
+import uuid
+import hashlib
+import hmac
+import secrets
+from datetime import datetime, timedelta, timezone
+
+import psycopg
+from psycopg.rows import dict_row
+from jose import jwt, JWTError
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -148,3 +160,183 @@ def chat(payload: ChatRequest):
         status_code=502,
         detail="All configured AI providers failed. Check Render logs and verify API keys, model access, and quotas. " + "; ".join(errors),
     )
+
+# Authentication and support API
+bearer = HTTPBearer(auto_error=False)
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+JWT_ALGORITHM = "HS256"
+
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=10, max_length=128)
+    display_name: str = Field(min_length=2, max_length=80)
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=1, max_length=128)
+
+class TicketRequest(BaseModel):
+    subject: str = Field(min_length=3, max_length=200)
+    message: str = Field(min_length=10, max_length=5000)
+
+class ReplyRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=5000)
+
+def db_connect():
+    url = os.getenv("DATABASE_URL", "").strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if not url:
+        raise HTTPException(status_code=503, detail="قاعدة البيانات غير مهيأة")
+    return psycopg.connect(url, connect_timeout=10, row_factory=dict_row)
+
+def ensure_auth_config():
+    if len(JWT_SECRET) < 32:
+        raise HTTPException(status_code=503, detail="أضف JWT_SECRET بطول 32 حرفاً على الأقل في Render")
+
+def password_hash(password, salt=None):
+    salt = salt or secrets.token_bytes(16)
+    digest = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1)
+    return salt.hex() + "$" + digest.hex()
+
+def password_matches(password, stored):
+    try:
+        salt_hex, digest_hex = stored.split("$", 1)
+        candidate = password_hash(password, bytes.fromhex(salt_hex)).split("$", 1)[1]
+        return hmac.compare_digest(candidate, digest_hex)
+    except Exception:
+        return False
+
+def admin_email(email):
+    allowed = {x.strip().lower() for x in os.getenv("ADMIN_EMAILS", "").split(",") if x.strip()}
+    return email.lower() in allowed
+
+def make_token(profile):
+    ensure_auth_config()
+    now = datetime.now(timezone.utc)
+    return jwt.encode({"sub": str(profile["id"]), "iat": now,
+                       "exp": now + timedelta(hours=24)}, JWT_SECRET, algorithm="HS256")
+
+def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
+    ensure_auth_config()
+    if not credentials:
+        raise HTTPException(status_code=401, detail="سجّل الدخول أولاً")
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=["HS256"])
+        user_id = str(uuid.UUID(payload.get("sub", "")))
+    except Exception:
+        raise HTTPException(status_code=401, detail="جلسة الدخول غير صالحة")
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id,email,display_name,role,created_at FROM profiles WHERE id=%s", (user_id,))
+            user = cur.fetchone()
+    if not user:
+        raise HTTPException(status_code=401, detail="الحساب غير موجود")
+    return user
+
+def require_admin(user=Depends(current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="هذه العملية للإدارة فقط")
+    return user
+
+@app.post("/api/auth/register")
+def register(payload: RegisterRequest):
+    ensure_auth_config()
+    email = payload.email.strip().lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(status_code=422, detail="البريد الإلكتروني غير صالح")
+    user_id = uuid.uuid4()
+    role = "admin" if admin_email(email) else "user"
+    try:
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""INSERT INTO profiles (id,auth_subject,email,display_name,role,password_hash)
+                               VALUES (%s,%s,%s,%s,%s,%s)
+                               RETURNING id,email,display_name,role,created_at""",
+                            (str(user_id),str(user_id),email,payload.display_name.strip(),role,password_hash(payload.password)))
+                profile = cur.fetchone()
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(status_code=409, detail="هذا البريد مسجل مسبقاً")
+    return {"token": make_token(profile), "user": profile}
+
+@app.post("/api/auth/login")
+def login(payload: LoginRequest):
+    ensure_auth_config()
+    email = payload.email.strip().lower()
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id,email,display_name,role,password_hash,created_at FROM profiles WHERE email=%s", (email,))
+            profile = cur.fetchone()
+            if not profile or not profile.get("password_hash") or not password_matches(payload.password, profile["password_hash"]):
+                raise HTTPException(status_code=401, detail="البريد أو كلمة المرور غير صحيحة")
+            role = "admin" if admin_email(email) else "user"
+            cur.execute("UPDATE profiles SET role=%s WHERE id=%s RETURNING id,email,display_name,role,created_at", (role,str(profile["id"])))
+            profile = cur.fetchone()
+    return {"token": make_token(profile), "user": profile}
+
+@app.get("/api/auth/me")
+def me(user=Depends(current_user)):
+    return {"user": user}
+
+@app.post("/api/support/tickets")
+def create_ticket(payload: TicketRequest, user=Depends(current_user)):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO support_tickets (user_id,subject,message) VALUES (%s,%s,%s) RETURNING id,subject,message,status,priority,created_at,updated_at",
+                        (str(user["id"]),payload.subject.strip(),payload.message.strip()))
+            return cur.fetchone()
+
+@app.get("/api/support/tickets")
+def list_tickets(user=Depends(current_user)):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            if user["role"] == "admin":
+                cur.execute("""SELECT t.id,t.user_id,p.email,t.subject,t.message,t.status,t.priority,t.created_at,t.updated_at
+                               FROM support_tickets t JOIN profiles p ON p.id=t.user_id ORDER BY t.updated_at DESC LIMIT 200""")
+            else:
+                cur.execute("""SELECT id,user_id,subject,message,status,priority,created_at,updated_at
+                               FROM support_tickets WHERE user_id=%s ORDER BY updated_at DESC""",(str(user["id"]),))
+            return {"tickets":cur.fetchall()}
+
+@app.get("/api/support/tickets/{ticket_id}/replies")
+def list_replies(ticket_id: int, user=Depends(current_user)):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id FROM support_tickets WHERE id=%s",(ticket_id,))
+            ticket=cur.fetchone()
+            if not ticket: raise HTTPException(status_code=404,detail="التذكرة غير موجودة")
+            if user["role"]!="admin" and str(ticket["user_id"])!=str(user["id"]):
+                raise HTTPException(status_code=403,detail="لا يمكنك الوصول إلى هذه التذكرة")
+            cur.execute("""SELECT r.id,r.ticket_id,r.sender_role,r.message,r.created_at,p.display_name
+                           FROM support_replies r LEFT JOIN profiles p ON p.id=r.sender_user_id
+                           WHERE r.ticket_id=%s ORDER BY r.created_at""",(ticket_id,))
+            return {"replies":cur.fetchall()}
+
+@app.post("/api/support/tickets/{ticket_id}/replies")
+def add_reply(ticket_id: int,payload: ReplyRequest,user=Depends(current_user)):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id FROM support_tickets WHERE id=%s FOR UPDATE",(ticket_id,))
+            ticket=cur.fetchone()
+            if not ticket: raise HTTPException(status_code=404,detail="التذكرة غير موجودة")
+            if user["role"]!="admin" and str(ticket["user_id"])!=str(user["id"]):
+                raise HTTPException(status_code=403,detail="لا يمكنك الرد على هذه التذكرة")
+            role="admin" if user["role"]=="admin" else "user"
+            cur.execute("""INSERT INTO support_replies (ticket_id,sender_user_id,sender_role,message)
+                           VALUES (%s,%s,%s,%s) RETURNING id,ticket_id,sender_role,message,created_at""",
+                        (ticket_id,str(user["id"]),role,payload.message.strip()))
+            reply=cur.fetchone()
+            cur.execute("UPDATE support_tickets SET status=%s,updated_at=NOW() WHERE id=%s",
+                        ("answered" if role=="admin" else "in_progress",ticket_id))
+            return reply
+
+@app.patch("/api/support/tickets/{ticket_id}/status")
+def update_ticket_status(ticket_id: int,status: str,user=Depends(require_admin)):
+    if status not in {"open","in_progress","answered","closed"}:
+        raise HTTPException(status_code=422,detail="حالة التذكرة غير صالحة")
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE support_tickets SET status=%s,updated_at=NOW() WHERE id=%s RETURNING id,status",(status,ticket_id))
+            result=cur.fetchone()
+            if not result: raise HTTPException(status_code=404,detail="التذكرة غير موجودة")
+            return result
