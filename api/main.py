@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from groq import Groq
+from database import initialize_database, database_is_ready
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("smarthub")
@@ -19,6 +20,13 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
+
+@app.on_event("startup")
+def startup():
+    try:
+        initialize_database()
+    except Exception:
+        logger.exception("PostgreSQL initialization failed")
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
@@ -108,6 +116,7 @@ def root():
 def health():
     return {
         "status": "ok",
+        "database": "connected" if database_is_ready() else "unavailable",
         "providers": {
             "groq": bool(os.getenv("GROQ_API_KEY")),
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
