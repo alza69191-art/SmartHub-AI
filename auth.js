@@ -6,7 +6,8 @@ function setAuthenticated(on){
  $("registerNavButton").hidden=on;
  $("headerUser").hidden=!on;
  $("headerUser").textContent=on?(me.display_name+" ▾"):"";
- document.querySelector(".account-grid").hidden=on;
+ $("registerForm").hidden=on;
+ [...$("loginForm").children].forEach(el=>{if(el.id!=="logoutButton")el.hidden=on;});
  $("authState").textContent=on?(me.display_name+" — "+(me.role==="admin"?"مدير":"مستخدم")):"غير مسجل";
  $("supportArea").hidden=!on;
  if(on) $("adminArea").hidden=me.role!=="admin";
