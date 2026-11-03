@@ -2,6 +2,7 @@ import logging
 import os
 
 import psycopg
+from psycopg.rows import dict_row
 
 logger = logging.getLogger('smarthub.database')
 
@@ -47,6 +48,7 @@ def initialize_database():
         'CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status)',
         'CREATE INDEX IF NOT EXISTS idx_support_replies_ticket_id ON support_replies(ticket_id)',
     ]
+    statements.append('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS password_hash TEXT')
     with psycopg.connect(url, connect_timeout=10) as connection:
         with connection.cursor() as cursor:
             for statement in statements:
