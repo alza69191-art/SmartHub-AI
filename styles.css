@@ -308,3 +308,55 @@ footer .logo{font-size:17px}
  .composer-shortcut,.composer-count{font-size:9px}
  .composer-heading{min-height:40px}
 }
+
+
+/* Assistant light theme: white surfaces and black action buttons */
+.assistant-body{background:#fff;color:#111}
+.assistant-body .site-header{background:#fff;border-bottom-color:#e5e7eb}
+.assistant-body .logo,.assistant-body .top-link{color:#24292f}
+.assistant-body .logo b{color:#57606a}
+.assistant-body .top-link:hover{background:#f3f4f6;color:#111}
+.assistant-body .top-link.active{background:#111;color:#fff;border-color:#111}
+.assistant-body .register-nav-button{background:#111;color:#fff;border-color:#111}
+.assistant-body .register-nav-button:hover{background:#333;border-color:#333}
+.assistant-body .assistant-layout,.assistant-body .assistant-main{background:#fff}
+.assistant-body .assistant-rail{background:#f6f8fa;border-left-color:#d0d7de}
+.assistant-body .new-chat-button{background:#111;color:#fff;border-color:#111}
+.assistant-body .rail-label,.assistant-body .rail-tip p{color:#57606a}
+.assistant-body .rail-prompt{color:#24292f}
+.assistant-body .rail-prompt:hover{background:#eaeef2;border-color:#d0d7de;color:#111}
+.assistant-body .rail-tip{background:#fff;border-color:#d0d7de}
+.assistant-body .rail-tip b{color:#111}
+.assistant-body .assistant-toolbar{border-bottom-color:#d8dee4}
+.assistant-body .assistant-toolbar small{color:#57606a}
+.assistant-body .live-dot{background:#1a7f37}
+.assistant-body .toolbar-actions button{background:#111;color:#fff;border-color:#111}
+.assistant-body .toolbar-actions button:hover{background:#333;color:#fff}
+.assistant-body .chat-stage{background:#fff}
+.assistant-body .welcome-symbol{background:#f6f8fa;border-color:#d0d7de;color:#111}
+.assistant-body .assistant-welcome>small{color:#57606a}
+.assistant-body .assistant-welcome h1{color:#111}
+.assistant-body .assistant-welcome h1 em{color:#57606a}
+.assistant-body .assistant-welcome>p{color:#57606a}
+.assistant-body .suggestion-grid button{background:#fff;color:#24292f;border-color:#d0d7de}
+.assistant-body .suggestion-grid button:hover{background:#f6f8fa;border-color:#8c959f}
+.assistant-body .suggestion-grid span{color:#57606a}
+.assistant-body .composer-box{background:#fff;border-color:#d0d7de;box-shadow:0 8px 24px #1f23280d}
+.assistant-body .composer-box:focus-within{border-color:#8c959f;box-shadow:0 0 0 3px #1f232812}
+.assistant-body .composer-heading{background:#f6f8fa;border-bottom-color:#d8dee4;color:#24292f}
+.assistant-body .composer-heading-mark{border-color:#d0d7de;color:#24292f}
+.assistant-body .composer-heading-hint,.assistant-body .composer-meta,.assistant-body .composer-shortcut,.assistant-body .composer-count{color:#57606a}
+.assistant-body .composer-box textarea{color:#111}
+.assistant-body .composer-box textarea::placeholder{color:#6e7781}
+.assistant-body .composer-bottom{background:#fff;border-top-color:#d8dee4}
+.assistant-body .composer-bottom button{background:#111;color:#fff;border-color:#111}
+.assistant-body .composer-bottom button:hover{background:#333;color:#fff}
+.assistant-body .composer-wrap>p{color:#6e7781}
+.assistant-body .chat-stage .chat-message{background:#f6f8fa;border-color:#d0d7de}
+.assistant-body .chat-stage .chat-message.user{background:#fff;border-color:#8c959f}
+.assistant-body .message-head{color:#111}
+.assistant-body .message-head small{color:#57606a}
+.assistant-body .chat-stage .chat-message p{color:#24292f}
+.assistant-body .message-tools button{color:#57606a}
+.assistant-body .typing p{color:#57606a!important}
+.assistant-body #aiChatStatus{color:#6e7781}
