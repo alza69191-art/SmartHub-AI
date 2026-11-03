@@ -14,5 +14,7 @@ services:
         sync: false
       - key: HF_TOKEN
         sync: false
+      - key: DATABASE_URL
+        sync: false
       - key: FRONTEND_ORIGIN
         value: "*"
