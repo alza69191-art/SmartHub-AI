@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /account.html
+Disallow: /register.html
+Disallow: /support.html
+Sitemap: https://alza69191-art.github.io/SmartHub-AI/sitemap.xml
