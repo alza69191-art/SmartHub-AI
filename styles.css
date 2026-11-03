@@ -360,3 +360,25 @@ footer .logo{font-size:17px}
 .assistant-body .message-tools button{color:#57606a}
 .assistant-body .typing p{color:#57606a!important}
 .assistant-body #aiChatStatus{color:#6e7781}
+
+
+/* Minimal assistant screen: greeting and message box only */
+.assistant-minimal{height:100vh;height:100dvh;min-height:0;overflow:hidden;background:#fff!important;color:#24292f!important}
+.assistant-minimal .minimal-chat{display:flex;width:100%;height:100%;min-height:0;flex-direction:column}
+.assistant-minimal .chat-stage{display:flex;width:min(820px,100%);min-height:0;flex:1;flex-direction:column;overflow-y:auto;margin:0 auto;padding:24px 22px 12px;background:#fff}
+.assistant-minimal .assistant-welcome{margin:auto;padding:20px;text-align:center}
+.assistant-minimal .assistant-welcome h1{margin:0;color:#24292f;font-size:clamp(36px,6vw,52px);font-weight:700}
+.assistant-minimal .composer-wrap{width:min(820px,100%);margin:0 auto;padding:12px 22px max(22px,env(safe-area-inset-bottom));}
+.assistant-minimal .composer-box{padding:10px 12px;border:1px solid #d0d7de;border-radius:16px;background:#fff;box-shadow:0 4px 18px #1f23280d}
+.assistant-minimal .composer-box:focus-within{border-color:#8c959f;box-shadow:0 0 0 3px #1f232812}
+.assistant-minimal .composer-box textarea{min-height:42px;max-height:180px;padding:8px 6px;color:#24292f;font-size:16px;line-height:1.7}
+.assistant-minimal .composer-box textarea::placeholder{color:#6e7781}
+.assistant-minimal .composer-bottom{min-height:36px;padding:3px 2px 0;border:0;background:transparent}
+.assistant-minimal .composer-bottom button{width:36px;height:36px;border:0;border-radius:50%;background:#111;color:#fff}
+.assistant-minimal .composer-bottom button:hover{background:#333}
+.assistant-minimal .chat-stage .chat-message{max-width:88%;padding:14px 16px;border:1px solid #d0d7de;border-radius:14px;background:#f6f8fa}
+.assistant-minimal .chat-stage .chat-message.user{align-self:flex-end;background:#fff}
+.assistant-minimal .message-head{color:#24292f}
+.assistant-minimal .chat-stage .chat-message p{color:#24292f}
+.assistant-minimal .message-tools button{color:#57606a}
+.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
