@@ -1,0 +1,5 @@
+(() => {
+const API=(window.SMART_HUB_API_URL||"").replace(/\/$/,""),$=id=>document.getElementById(id),form=$("registerForm"),msg=$("accountMessage");
+const say=(s,bad=false)=>{msg.textContent=s;msg.classList.toggle("error",bad)};
+form.addEventListener("submit",async e=>{e.preventDefault();const b=form.querySelector("button");b.disabled=true;say("جارٍ إنشاء حسابك...");try{if(!API)throw Error("رابط الخادم غير مضبوط");const r=await fetch(API+"/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({display_name:$("registerName").value.trim(),email:$("registerEmail").value.trim(),password:$("registerPassword").value})});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.detail||"تعذر إنشاء الحساب");sessionStorage.setItem("sh-token",d.token);sessionStorage.setItem("sh-user",JSON.stringify(d.user));say("تم إنشاء الحساب بنجاح.");location.href="support.html"}catch(err){say(err.message,true)}finally{b.disabled=false}});
+})();
