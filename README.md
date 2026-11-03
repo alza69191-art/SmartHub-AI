@@ -55,8 +55,9 @@ Passwords are stored as salted scrypt hashes; plaintext passwords are never stor
 ### Required Render environment variables
 - `DATABASE_URL`: the Render PostgreSQL **Internal Database URL**.
 - `JWT_SECRET`: a random secret of at least 32 characters. Generate one securely and add it only in Render.
-- `ADMIN_EMAILS`: comma-separated email addresses that are allowed to receive the admin role. Set this before creating the administrator account.
+- `ADMIN_EMAILS`: comma-separated email addresses allowed to request admin activation.
+- `ADMIN_SETUP_KEY`: a separate secret used once during administrator registration. Admin access requires both an allowlisted email and this key.
 
-After setting these variables, redeploy the Render API. Create the administrator account using an address listed in `ADMIN_EMAILS`; all other registrations receive the regular user role.
+After setting these variables, redeploy the Render API. Create the administrator account using an address listed in `ADMIN_EMAILS` and enter `ADMIN_SETUP_KEY` in the admin setup field. Other registrations receive the regular user role. Do not share the setup key.
 
 This first release does not yet include email verification, password reset, or automated abuse/rate limiting. Do not treat it as a fully hardened production identity system until those controls are added. The browser keeps the bearer token in session storage for the current tab.
