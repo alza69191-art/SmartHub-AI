@@ -10,5 +10,9 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
       - key: FRONTEND_ORIGIN
         value: "*"
