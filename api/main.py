@@ -52,7 +52,7 @@ def chat(payload: ChatRequest):
     try:
         client = Groq(api_key=api_key)
         result = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=messages,
             temperature=0.7,
             max_tokens=1200,
