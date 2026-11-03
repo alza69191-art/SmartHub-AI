@@ -1,31 +1,8 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="المساعد الذكي SmartHub AI">
-<title>SmartHub AI</title>
-<link rel="stylesheet" href="styles.css">
-</head>
-<body class="assistant-body assistant-minimal">
-<main class="minimal-chat">
-  <section id="aiChatMessages" class="chat-stage" aria-live="polite">
-    <div id="welcomePanel" class="assistant-welcome">
-      <h1>مرحباً</h1>
-    </div>
-  </section>
-  <div class="composer-wrap">
-    <div class="composer-box">
-      <textarea id="aiChatInput" rows="1" maxlength="8000" aria-label="اكتب رسالتك" placeholder="اكتب رسالتك..."></textarea>
-      <div class="composer-bottom">
-        <span id="charCount" class="composer-count" aria-hidden="true"></span>
-        <button id="sendChat" type="button" aria-label="إرسال" title="إرسال"><span>↑</span></button>
-      </div>
-    </div>
-    <p id="aiChatStatus" role="status" class="visually-hidden" aria-live="polite"></p>
-  </div>
-</main>
-<script src="config.js"></script>
-<script src="chat.js"></script>
-</body>
-</html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="المساعد الذكي SmartHub AI"><title>المساعد الذكي | SmartHub AI</title><link rel="stylesheet" href="styles.css"></head><body class="assistant-body">
+<header class="site-header"><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><nav class="top-nav" aria-label="التنقل الرئيسي"><a class="top-link" href="index.html">⌂ الرئيسية</a><a class="top-link" href="tools.html">▦ الأدوات</a><a class="top-link active" aria-current="page" href="assistant.html">✧ المساعد الذكي</a><a class="top-link" href="support.html">◉ الدعم الفني</a><a class="top-link" href="about.html">ⓘ عن المنصة</a></nav><div class="header-actions"><a class="register-nav-button" href="account.html">تسجيل الدخول</a><a class="register-nav-button" href="register.html">إنشاء حساب</a></div></header>
+<main class="assistant-layout"><aside class="assistant-rail"><a class="new-chat-button" href="assistant.html">＋ محادثة جديدة</a><div class="rail-label">ماذا يمكنني أن أفعل؟</div><button class="rail-prompt" data-prompt="اشرح لي موضوعاً معقداً بطريقة بسيطة مع أمثلة.">✧ <span>شرح وتعلّم</span></button><button class="rail-prompt" data-prompt="ساعدني في كتابة خطة عمل واضحة خطوة بخطوة.">▤ <span>التخطيط والكتابة</span></button><button class="rail-prompt" data-prompt="راجع هذا الكود واكتشف الأخطاء واقترح تحسينات.">⌘ <span>البرمجة</span></button><button class="rail-prompt" data-prompt="اقترح أفكاراً إبداعية جديدة وطور أفضل فكرة.">◇ <span>أفكار وإبداع</span></button><div class="rail-tip"><b>نصيحة</b><p>اكتب هدفك والسياق والنتيجة التي تريدها لتحصل على إجابة أدق.</p></div></aside>
+<section class="assistant-main"><div class="assistant-toolbar"><div><span class="live-dot"></span><b>SmartHub AI</b><small id="providerLabel">مساعدك الذكي</small></div><div class="toolbar-actions"><button id="clearChat" type="button" title="مسح المحادثة">مسح المحادثة</button><button id="exportChat" type="button" title="تنزيل المحادثة">تنزيل</button></div></div>
+<div id="aiChatMessages" class="chat-stage" aria-live="polite"><div id="welcomePanel" class="assistant-welcome"><div class="welcome-symbol">✦</div><small>SMART ASSISTANT</small><h1>كيف أستطيع <em>مساعدتك؟</em></h1><p>اسأل، اكتب، حلّل، أو اطلب المساعدة في أي فكرة تعمل عليها.</p><div class="suggestion-grid"><button data-prompt="ضع لي خطة عملية لتعلم مهارة جديدة خلال 30 يوماً."><b>◷ خطة تعلّم</b><span>حوّل هدفك إلى خطوات واضحة</span></button><button data-prompt="اكتب لي فكرة مشروع رقمي مبتكر مع خطة تنفيذ أولية."><b>✧ ابتكار مشروع</b><span>ابدأ من فكرة إلى خطة</span></button><button data-prompt="اشرح لي هذا المفهوم ببساطة مع مثال واقعي."><b>▤ شرح مبسط</b><span>افهم المواضيع الصعبة</span></button><button data-prompt="اكتب كوداً نظيفاً واشرح طريقة تشغيله خطوة بخطوة."><b>⌘ مساعد برمجي</b><span>حلّل وابنِ وحسّن الكود</span></button></div></div></div>
+<div class="composer-wrap"><div class="composer-box"><div class="composer-heading"><span class="composer-heading-mark">✎</span><b>رسالة جديدة</b><span class="composer-heading-hint">SMART HUB AI</span></div><textarea id="aiChatInput" rows="3" maxlength="8000" aria-label="اكتب رسالتك" placeholder="ما الذي تريد العمل عليه؟ اكتب سؤالك أو فكرتك هنا..."></textarea><div class="composer-bottom"><div class="composer-meta"><span class="composer-shortcut">↵ Enter للإرسال</span><span class="composer-shortcut">⇧ Shift + Enter لسطر جديد</span><span id="charCount" class="composer-count">0 / 8000</span></div><button id="sendChat" type="button" aria-label="إرسال الرسالة" title="إرسال الرسالة"><span>↑</span></button></div></div><p id="aiChatStatus" role="status">قد يخطئ الذكاء الاصطناعي؛ راجع المعلومات المهمة.</p></div></section></main>
+<script src="config.js"></script><script src="chat.js"></script></body></html>
