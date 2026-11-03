@@ -278,3 +278,21 @@ main,footer{margin-right:0}
  .tickets-heading{align-items:start;gap:10px;flex-direction:column}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+
+/* Minimal assistant: reply area + message box only */
+.assistant-minimal{height:100vh;min-height:420px;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#173f70 0,transparent 48%),#061b3b}
+.minimal-assistant{height:100%;width:min(900px,100%);margin:0 auto;padding:24px 22px 20px;display:flex;flex-direction:column;gap:18px}
+.minimal-replies{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:12px 4px}
+.minimal-message{max-width:86%;padding:14px 17px;border:1px solid #583a91;border-radius:15px;background:#211044;align-self:flex-start;box-shadow:0 8px 24px #020a1d33}
+.minimal-message.user{align-self:flex-end;background:#123b6d;border-color:#2867a4}
+.minimal-label{font-size:11px;font-weight:700;color:#c8aaff;margin-bottom:6px}
+.minimal-message p{margin:0;color:#f7f4ff;font-size:15px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere}
+.minimal-message.typing p{color:#c8aaff}
+.minimal-composer{display:flex;align-items:flex-end;gap:10px;padding:12px;background:#211044;border:1px solid #6949a0;border-radius:18px;box-shadow:0 12px 35px #0005}
+.minimal-composer:focus-within{border-color:#a77bff;box-shadow:0 0 0 3px #9b87ff2b}
+.minimal-composer textarea{flex:1;min-width:0;max-height:180px;resize:none;border:0;outline:0;background:transparent;color:white;padding:8px 6px;font:16px/1.7 Tajawal,sans-serif}
+.minimal-composer textarea::placeholder{color:#b8acd2}
+.minimal-composer button{flex:0 0 42px;width:42px;height:42px;border:0;border-radius:13px;background:linear-gradient(135deg,#a77bff,#7041c2);color:white;font-size:25px;line-height:1}
+.minimal-composer button:disabled{opacity:.55;cursor:wait}
+@media(max-width:600px){.minimal-assistant{padding:12px 10px}.minimal-message{max-width:94%}.minimal-composer{padding:9px}.minimal-composer textarea{font-size:15px}}
