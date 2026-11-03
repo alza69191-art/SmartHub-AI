@@ -44,6 +44,7 @@ def initialize_database():
             message TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )''',
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_email_lower_unique ON profiles (LOWER(email)) WHERE email IS NOT NULL',
         'CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id)',
         'CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status)',
         'CREATE INDEX IF NOT EXISTS idx_support_replies_ticket_id ON support_replies(ticket_id)',
