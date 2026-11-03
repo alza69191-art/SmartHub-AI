@@ -170,6 +170,7 @@ class RegisterRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=10, max_length=128)
     display_name: str = Field(min_length=2, max_length=80)
+    admin_setup_key: str = Field(default="", max_length=200)
 
 class LoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
@@ -246,7 +247,9 @@ def register(payload: RegisterRequest):
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=422, detail="البريد الإلكتروني غير صالح")
     user_id = uuid.uuid4()
-    role = "admin" if admin_email(email) else "user"
+    setup_key = os.getenv("ADMIN_SETUP_KEY", "")
+    is_admin = bool(setup_key) and admin_email(email) and hmac.compare_digest(payload.admin_setup_key, setup_key)
+    role = "admin" if is_admin else "user"
     try:
         with db_connect() as conn:
             with conn.cursor() as cur:
@@ -269,7 +272,7 @@ def login(payload: LoginRequest):
             profile = cur.fetchone()
             if not profile or not profile.get("password_hash") or not password_matches(payload.password, profile["password_hash"]):
                 raise HTTPException(status_code=401, detail="البريد أو كلمة المرور غير صحيحة")
-            role = "admin" if admin_email(email) else "user"
+            role = "admin" if (profile["role"] == "admin" and admin_email(email)) else "user"
             cur.execute("UPDATE profiles SET role=%s WHERE id=%s RETURNING id,email,display_name,role,created_at", (role,str(profile["id"])))
             profile = cur.fetchone()
     return {"token": make_token(profile), "user": profile}
