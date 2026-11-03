@@ -44,3 +44,19 @@ The API connects to a Render PostgreSQL database using the server-side DATABASE_
 On startup, the API creates the initial profiles, support_tickets, and support_replies tables and their indexes if they do not already exist. The /health response reports whether PostgreSQL is reachable.
 
 This schema is groundwork only: authentication, authorization, and protected support-ticket endpoints must be implemented before exposing the tables to users. Admin roles must only be assigned through a trusted server-side process.
+
+
+## Accounts and support center
+
+The API now includes email/password registration and login, bearer-token sessions,
+user profiles, support tickets, ticket replies, and admin-only ticket status changes.
+Passwords are stored as salted scrypt hashes; plaintext passwords are never stored.
+
+### Required Render environment variables
+- `DATABASE_URL`: the Render PostgreSQL **Internal Database URL**.
+- `JWT_SECRET`: a random secret of at least 32 characters. Generate one securely and add it only in Render.
+- `ADMIN_EMAILS`: comma-separated email addresses that are allowed to receive the admin role. Set this before creating the administrator account.
+
+After setting these variables, redeploy the Render API. Create the administrator account using an address listed in `ADMIN_EMAILS`; all other registrations receive the regular user role.
+
+This first release does not yet include email verification, password reset, or automated abuse/rate limiting. Do not treat it as a fully hardened production identity system until those controls are added. The browser keeps the bearer token in session storage for the current tab.
