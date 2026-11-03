@@ -1,52 +1,17 @@
-const API_BASE_URL = (window.SMART_HUB_API_URL || "").replace(/\/$/, "");
-const chatForm = document.getElementById("aiChatForm");
-const chatInput = document.getElementById("aiChatInput");
-const chatMessages = document.getElementById("aiChatMessages");
-const chatStatus = document.getElementById("aiChatStatus");
-const chatHistory = [];
-
-function addChatMessage(role, content) {
-  const row = document.createElement("div");
-  row.className = "chat-message " + role;
-  const label = document.createElement("strong");
-  label.textContent = role === "user" ? "أنت" : "SmartHub AI";
-  const body = document.createElement("p");
-  body.textContent = content;
-  row.append(label, body);
-  chatMessages.appendChild(row);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-chatForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const message = chatInput.value.trim();
-  if (!message) return;
-  if (!API_BASE_URL) {
-    chatStatus.textContent = "الخادم لم يُربط بعد. بعد نشر Render سنضيف رابط الخدمة هنا.";
-    return;
-  }
-  addChatMessage("user", message);
-  chatHistory.push({ role: "user", content: message });
-  chatInput.value = "";
-  chatStatus.textContent = "جاري التفكير...";
-  const submit = chatForm.querySelector("button");
-  submit.disabled = true;
-  try {
-    const response = await fetch(API_BASE_URL + "/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, history: chatHistory.slice(0, -1) })
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || "تعذر الاتصال بالخادم");
-    const reply = data.reply || "لم يصل رد.";
-    addChatMessage("assistant", reply);
-    chatHistory.push({ role: "assistant", content: reply });
-    chatStatus.textContent = "متصل";
-  } catch (error) {
-    chatStatus.textContent = "خطأ: " + error.message;
-  } finally {
-    submit.disabled = false;
-    chatInput.focus();
-  }
-});
+(() => {
+const API=(window.SMART_HUB_API_URL||"").replace(/\/$/,""),$=id=>document.getElementById(id),formInput=$("aiChatInput"),host=$("aiChatMessages"),status=$("aiChatStatus"),send=$("sendChat");
+const KEY="smarthub-chat-v1";let history=[];try{history=JSON.parse(localStorage.getItem(KEY)||"[]");if(!Array.isArray(history))history=[]}catch(_){history=[]}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(history.slice(-40)))}catch(_){}}
+function scroll(){host.scrollTop=host.scrollHeight}
+function add(role,content,provider){const row=document.createElement("article");row.className="chat-message "+(role==="user"?"user":"assistant");const head=document.createElement("div");head.className="message-head";const label=document.createElement("b");label.textContent=role==="user"?"أنت":"SmartHub AI";head.append(label);if(provider&&role==="assistant"){const tag=document.createElement("small");tag.textContent=provider;head.append(tag)}const body=document.createElement("p");body.textContent=content;const tools=document.createElement("div");tools.className="message-tools";const copy=document.createElement("button");copy.type="button";copy.textContent="نسخ";copy.onclick=async()=>{try{await navigator.clipboard.writeText(content);copy.textContent="تم النسخ"}catch(_){copy.textContent="تعذر النسخ"}setTimeout(()=>copy.textContent="نسخ",1600)};tools.append(copy);row.append(head,body,tools);host.append(row);scroll();return row}
+function welcome(show){const w=$("welcomePanel");if(w)w.hidden=!show}
+function render(){host.querySelectorAll(".chat-message").forEach(x=>x.remove());welcome(history.length===0);history.forEach(x=>add(x.role,x.content,x.provider));scroll()}
+function setBusy(on){send.disabled=on;formInput.disabled=on;send.textContent=on?"…":"↑"}
+async function submit(text){const message=(text||formInput.value).trim();if(!message||send.disabled)return;if(!API){status.textContent="رابط الخادم غير مضبوط في config.js.";return}welcome(false);history.push({role:"user",content:message});add("user",message);save();formInput.value="";formInput.style.height="auto";status.textContent="يفكر SmartHub AI الآن...";setBusy(true);const typing=add("assistant","جارٍ إعداد الإجابة...");typing.classList.add("typing");try{const response=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,history:history.slice(0,-1).slice(-10)})});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.detail||"تعذر الحصول على رد");const reply=data.reply||"لم يصل رد من المساعد.";typing.remove();history.push({role:"assistant",content:reply,provider:data.provider||""});add("assistant",reply,data.provider||"");save();$("providerLabel").textContent=data.provider?"متصل عبر "+data.provider:"متصل"}catch(e){typing.remove();history.pop();save();status.textContent="تعذر الاتصال: "+e.message;add("assistant","لم أتمكن من إكمال الطلب. تحقق من اتصال الخادم ومفاتيح مزود الذكاء الاصطناعي، ثم حاول مجدداً.")}finally{setBusy(false);formInput.focus()}}
+send.addEventListener("click",()=>submit());formInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit()}});formInput.addEventListener("input",()=>{formInput.style.height="auto";formInput.style.height=Math.min(formInput.scrollHeight,180)+"px"});
+document.querySelectorAll("[data-prompt]").forEach(b=>b.addEventListener("click",()=>{formInput.value=b.dataset.prompt;formInput.focus();if(b.classList.contains("suggestion-grid"))return}));
+document.querySelectorAll(".suggestion-grid [data-prompt],.rail-prompt[data-prompt]").forEach(b=>b.addEventListener("click",()=>submit(b.dataset.prompt)));
+$("clearChat").onclick=()=>{if(!history.length)return;history=[];save();render();status.textContent="بدأت محادثة جديدة."};
+$("exportChat").onclick=()=>{if(!history.length){status.textContent="لا توجد محادثة لتنزيلها.";return}const content=history.map(x=>(x.role==="user"?"أنت":"SmartHub AI")+":\n"+x.content).join("\n\n");const blob=new Blob([content],{type:"text/plain;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="smarthub-chat.txt";a.click();URL.revokeObjectURL(url)};
+render();
+})();
