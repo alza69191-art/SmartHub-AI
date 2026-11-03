@@ -23,3 +23,15 @@ All tools run locally in the browser. User-entered text is not sent to a server.
 
 ## Future AI integrations
 GitHub Pages is static hosting. Never put private API keys in browser files. Add AI providers through a backend or serverless function and store credentials in server-side environment variables.
+
+ 
+## Groq AI backend on Render
+
+The FastAPI backend lives in `api/`. The `render.yaml` file defines a Render web service.
+1. In Render, choose **New → Blueprint** and connect this repository.
+2. Review the `smarthub-ai-api` service and deploy it.
+3. In the service's **Environment** settings, add `GROQ_API_KEY` with your private Groq key. Never commit the key.
+4. Copy the deployed service URL and set `window.SMART_HUB_API_URL` in `config.js` to that URL, then commit the change.
+5. Redeploy the static GitHub Pages site if required.
+
+The chat uses the server-side Groq client and the `llama-3.3-70b-versatile` model. Configure `FRONTEND_ORIGIN` to your exact GitHub Pages origin before public launch.
