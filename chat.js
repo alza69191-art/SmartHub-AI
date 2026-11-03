@@ -16,12 +16,9 @@
   function add(role, content, provider) {
     const row = document.createElement("article");
     row.className = "minimal-message " + (role === "user" ? "user" : "assistant");
-    const label = document.createElement("div");
-    label.className = "minimal-label";
-    label.textContent = role === "user" ? "أنت" : (provider ? "SmartHub AI · " + provider : "SmartHub AI");
     const body = document.createElement("p");
     body.textContent = content;
-    row.append(label, body);
+    row.append(body);
     host.append(row);
     scroll();
     return row;
