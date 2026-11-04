@@ -186,7 +186,7 @@ def get_qwen_client():
         token = os.getenv("HF_TOKEN", "").strip() or None
         _qwen_client = Client(
             "Qwen/Qwen-Image-2.1",
-            token=token,
+            hf_token=token,
             httpx_kwargs={"timeout": 600},
             verbose=False,
         )
