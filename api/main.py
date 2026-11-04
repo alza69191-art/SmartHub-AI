@@ -1,5 +1,7 @@
 import logging
 import os
+import base64
+import threading
 import re
 import uuid
 import hashlib
@@ -11,6 +13,8 @@ import psycopg
 from psycopg.rows import dict_row
 from jose import jwt, JWTError
 from fastapi import Depends
+from starlette.concurrency import run_in_threadpool
+from gradio_client import Client
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
 from fastapi import FastAPI, HTTPException
@@ -160,6 +164,102 @@ def chat(payload: ChatRequest):
         status_code=502,
         detail="All configured AI providers failed. Check Render logs and verify API keys, model access, and quotas. " + "; ".join(errors),
     )
+
+
+# Qwen Image 2.1 generation through the official public Hugging Face Space.
+_qwen_client = None
+_qwen_lock = threading.Lock()
+
+class ImageGenerateRequest(BaseModel):
+    prompt: str = Field(min_length=3, max_length=4000)
+    enhance_prompt: bool = True
+    quality: str = Field(default="speed", pattern="^(speed|quality)$")
+    custom_size: bool = False
+    width: int = Field(default=1024, ge=256, le=2688)
+    height: int = Field(default=1024, ge=256, le=2688)
+    negative_prompt: str = Field(default="", max_length=1500)
+    seed: int = Field(default=0, ge=0, le=2147483647)
+
+def get_qwen_client():
+    global _qwen_client
+    if _qwen_client is None:
+        token = os.getenv("HF_TOKEN", "").strip() or None
+        _qwen_client = Client(
+            "Qwen/Qwen-Image-2.1",
+            token=token,
+            verbose=False,
+        )
+    return _qwen_client
+
+def qwen_image_to_data_url(result):
+    # Gradio Image outputs are normally downloaded to a local filepath.
+    if isinstance(result, (tuple, list)) and result:
+        result = result[0]
+    if isinstance(result, dict):
+        result = result.get("path") or result.get("url")
+    if not isinstance(result, str):
+        raise RuntimeError("Qwen returned an unsupported image result")
+    if result.startswith("http://") or result.startswith("https://"):
+        image_response = requests.get(result, timeout=90)
+        image_response.raise_for_status()
+        raw = image_response.content
+    else:
+        with open(result, "rb") as image_file:
+            raw = image_file.read()
+    if not raw:
+        raise RuntimeError("Qwen returned an empty image")
+    return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+
+def generate_qwen_image(payload):
+    # The Space uses a two-stage flow: prepare_request creates request_state,
+    # then generate_request consumes that state to run the GPU generation.
+    with _qwen_lock:
+        client = get_qwen_client()
+        prepared = client.predict(
+            input_images=None,
+            original_prompt=payload.prompt,
+            enable_extend=payload.enhance_prompt,
+            custom_size=payload.custom_size,
+            quality=payload.quality,
+            seed=payload.seed,
+            randomize_seed=True,
+            api_name="/prepare_request",
+        )
+        if not isinstance(prepared, (tuple, list)) or len(prepared) < 4:
+            raise RuntimeError("Unexpected response from Qwen prepare stage")
+        request_state = prepared[3]
+        actual_seed = prepared[1]
+        image_result = client.predict(
+            request_state=request_state,
+            original_prompt=payload.prompt,
+            enable_extend=payload.enhance_prompt,
+            custom_size=payload.custom_size,
+            log_dir="./generation_logs_paper_case",
+            seed=actual_seed,
+            height=payload.height,
+            width=payload.width,
+            negative_prompt=payload.negative_prompt or " ",
+            api_name="/generate_request",
+        )
+        return {
+            "image": qwen_image_to_data_url(image_result),
+            "seed": actual_seed,
+            "model": "Qwen Image 2.1",
+            "enhanced_prompt": prepared[2] or "",
+        }
+
+@app.post("/api/images/generate")
+async def generate_image(payload: ImageGenerateRequest, user=Depends(current_user)):
+    try:
+        result = await run_in_threadpool(generate_qwen_image, payload)
+        logger.info("Qwen image generated for user %s", user["id"])
+        return result
+    except Exception as exc:
+        logger.exception("Qwen Image 2.1 generation failed")
+        raise HTTPException(
+            status_code=502,
+            detail="تعذر توليد الصورة حالياً. تحقق من حالة Hugging Face Space وسجلات Render.",
+        )
 
 # Authentication and support API
 bearer = HTTPBearer(auto_error=False)
