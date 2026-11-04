@@ -498,16 +498,17 @@ def magic_hour_request(method, path, payload=None):
 @app.post("/api/video/generate")
 async def generate_video(payload: VideoGenerateRequest, user=Depends(current_user)):
     body = {
-        "end_seconds": payload.duration,
+        "end_seconds": float(payload.duration),
         "aspect_ratio": payload.aspect_ratio,
         "style": {"prompt": payload.prompt},
-        "model": payload.model,
-        "resolution": payload.resolution,
+        "resolution": "480p",
         "name": "SmartHub video",
     }
-    # Do not allow paid/high-cost options while the user is testing the free provider.
-    if payload.model == "default":
-        body["resolution"] = "480p"
+    # Omit model unless a verified model ID is explicitly selected. This lets
+    # Magic Hour apply its account-supported default instead of sending
+    # the literal string "default" as a model identifier.
+    if payload.model != "default":
+        body["model"] = payload.model
     result = await run_in_threadpool(magic_hour_request, "POST", "/v1/text-to-video", body)
     project_id = result.get("id")
     if not project_id:
@@ -528,11 +529,22 @@ async def video_status(project_id: str, user=Depends(current_user)):
     result = await run_in_threadpool(
         magic_hour_request, "GET", "/v1/video-projects/" + project_id
     )
+    # API responses may expose a singular download object or a downloads
+    # collection depending on the endpoint/API version.
+    download = result.get("download")
     downloads = result.get("downloads") or []
+    video_url = None
+    if isinstance(download, dict):
+        video_url = download.get("url")
+    elif isinstance(download, str):
+        video_url = download
+    if not video_url and downloads:
+        first = downloads[0]
+        video_url = first.get("url") if isinstance(first, dict) else first
     return {
         "project_id": result.get("id", project_id),
         "status": result.get("status", "unknown"),
-        "video_url": downloads[0].get("url") if downloads else None,
+        "video_url": video_url,
         "credits_charged": result.get("credits_charged"),
         "error": result.get("error"),
     }
