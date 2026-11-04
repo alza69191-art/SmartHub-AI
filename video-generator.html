@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مولّد الفيديو | SmartHub AI</title><link rel="stylesheet" href="styles.css">
+<style>
+.video-shell{max-width:850px;margin:30px auto;padding:26px;background:linear-gradient(145deg,#321c60,#21123f);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+.video-shell h1{margin:5px 0 8px;font-size:clamp(28px,5vw,42px)}.video-shell>p{color:var(--muted)}
+.video-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.video-grid label{display:block;color:#e0d4f6;font-size:13px;margin:12px 0 6px}
+.video-grid textarea,.video-grid select{width:100%;background:#160d30;border:1px solid var(--line);border-radius:10px;color:white;padding:13px;font:15px Tajawal}
+.video-grid textarea{min-height:150px;resize:vertical;grid-column:1/-1}
+.video-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.video-result{margin-top:22px;padding:16px;background:#160d30;border:1px solid var(--line-soft);border-radius:12px;display:none}
+.video-result video{width:100%;max-height:520px;border-radius:10px;background:#000}
+.video-status{color:var(--purple-light);font-weight:700}.video-error{color:var(--danger)}.video-hint{font-size:12px;color:var(--muted)}
+@media(max-width:650px){.video-grid{grid-template-columns:1fr}.video-grid textarea{grid-column:auto}.video-shell{padding:18px}}
+</style></head>
+<body>
+<header class="site-header"><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><nav class="top-nav"><a class="top-link" href="index.html">الرئيسية</a><a class="top-link" href="tools.html">الأدوات</a><a class="top-link" href="assistant.html">المساعد الذكي</a><a class="top-link" href="support.html">الدعم الفني</a></nav><div class="header-actions"><a class="register-nav-button" href="account.html">الحساب</a></div></header>
+<main class="standalone-page"><section class="video-shell">
+<small>SMART MEDIA STUDIO · TEXT TO VIDEO</small><h1>مولّد الفيديو بالذكاء الاصطناعي</h1>
+<p>أنشئ مقطعاً من وصف نصي باستخدام مزود Magic Hour. يبدأ الاختبار بالنموذج الافتراضي المجاني المتاح لحساب المزود (LTX-2.5 عادةً) وبدقة 480p.</p>
+<form id="videoForm"><div class="video-grid">
+<label style="grid-column:1/-1">وصف الفيديو</label><textarea id="prompt" minlength="5" maxlength="4000" required placeholder="صف المشهد والحركة والإضاءة وزاوية الكاميرا بالتفصيل..."></textarea>
+<div><label for="duration">المدة</label><select id="duration"><option value="5">5 ثوانٍ</option><option value="8">8 ثوانٍ</option><option value="10">10 ثوانٍ</option></select></div>
+<div><label for="ratio">نسبة الأبعاد</label><select id="ratio"><option value="16:9">أفقي 16:9</option><option value="9:16">عمودي 9:16</option><option value="1:1">مربع 1:1</option></select></div>
+</div><div class="video-actions"><button class="action" id="generate" type="submit">إنشاء الفيديو</button><a class="action alt" href="https://magichour.ai/developer" target="_blank" rel="noopener">الحصول على مفتاح API</a></div></form>
+<p class="video-hint">يتطلب تسجيل الدخول إلى SmartHub. لا تضع مفتاح المزود هنا؛ يُحفظ سرياً في Render. رصيد API التجريبي محدود وقد تختلف الأهلية والرصيد حسب الحساب. لا نبدأ التوليد قبل ضبط المفتاح.</p>
+<div id="result" class="video-result" aria-live="polite"><p id="status" class="video-status"></p><p id="detail" class="video-hint"></p><video id="output" controls playsinline hidden></video><a id="download" class="action" hidden download="smarthub-video.mp4">تحميل الفيديو</a></div>
+</section></main>
+<footer><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><span>© 2026 SmartHub AI</span><span>SmartHub Media Studio</span></footer>
+<script src="config.js"></script><script src="video-generator.js"></script>
+</body></html>
