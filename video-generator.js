@@ -1,0 +1,45 @@
+(() => {
+const API=(window.SMART_HUB_API_URL||"").replace(/\/$/,"");
+const $=id=>document.getElementById(id);
+const token=sessionStorage.getItem("sh-token")||"";
+const result=$("result"),status=$("status"),detail=$("detail"),video=$("output"),download=$("download"),button=$("generate");
+let pollTimer=null;
+function show(message,error=false){result.style.display="block";status.textContent=message;status.classList.toggle("video-error",error)}
+async function call(path,options={}){
+ const headers={"Content-Type":"application/json",...(options.headers||{})};
+ if(token)headers.Authorization="Bearer "+token;
+ const response=await fetch(API+path,{...options,headers});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(data.detail||"حدث خطأ في الاتصال بالخادم");
+ return data;
+}
+$("videoForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ if(!token){show("سجّل الدخول إلى SmartHub أولاً، ثم أعد المحاولة.",true);return}
+ if(!API){show("رابط الخادم غير مضبوط.",true);return}
+ if(pollTimer)clearTimeout(pollTimer);
+ video.hidden=true;download.hidden=true;detail.textContent="";button.disabled=true;button.textContent="جارٍ إرسال الطلب...";
+ show("جارٍ إرسال طلب إنشاء الفيديو...");
+ try{
+  const job=await call("/api/video/generate",{method:"POST",body:JSON.stringify({prompt:$("prompt").value.trim(),duration:Number($("duration").value),aspect_ratio:$("ratio").value,model:"default",resolution:"480p"})});
+  detail.textContent="رقم المهمة: "+job.project_id+" · التكلفة التقديرية: "+(job.credits_charged??"تُحدّد من المزود")+" رصيد";
+  await poll(job.project_id);
+ }catch(error){show(error.message,true);button.disabled=false;button.textContent="إنشاء الفيديو"}
+});
+async function poll(id){
+ try{
+  const data=await call("/api/video/status/"+encodeURIComponent(id));
+  const labels={queued:"الفيديو في قائمة الانتظار...",rendering:"جارٍ توليد الفيديو...",complete:"اكتمل توليد الفيديو.",error:"فشل توليد الفيديو.",canceled:"تم إلغاء المهمة."};
+  show(labels[data.status]||("حالة المهمة: "+data.status),data.status==="error"||data.status==="canceled");
+  if(data.status==="complete"&&data.video_url){
+   video.src=data.video_url;video.hidden=false;download.href=data.video_url;download.hidden=false;detail.textContent="اكتمل الفيديو. قد يكون رابط التنزيل مؤقتاً؛ حمّله الآن.";
+   button.disabled=false;button.textContent="إنشاء فيديو آخر";return;
+  }
+  if(data.status==="error"||data.status==="canceled"){
+   detail.textContent=typeof data.error==="string"?data.error:"تعذر إكمال المهمة. راجع رصيد المزود وسجلات الخادم.";
+   button.disabled=false;button.textContent="إعادة المحاولة";return;
+  }
+  pollTimer=setTimeout(()=>poll(id),6000);
+ }catch(error){show(error.message,true);button.disabled=false;button.textContent="إعادة المحاولة"}
+}
+})();
