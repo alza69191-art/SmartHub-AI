@@ -19,24 +19,24 @@ $("videoForm").addEventListener("submit",async event=>{
  if(!API){show("رابط الخادم غير مضبوط.",true);return}
  if(pollTimer)clearTimeout(pollTimer);
  video.hidden=true;download.hidden=true;detail.textContent="";button.disabled=true;button.textContent="جارٍ إرسال الطلب...";
- show("جارٍ إرسال طلب إنشاء الفيديو...");
+ show("جارٍ إرسال طلب إنشاء الفيديو إلى نموذج LTX...");
  try{
-  const job=await call("/api/video/generate",{method:"POST",body:JSON.stringify({prompt:$("prompt").value.trim(),duration:Number($("duration").value),aspect_ratio:$("ratio").value,model:"default",resolution:"480p"})});
-  detail.textContent="رقم المهمة: "+job.project_id+" · التكلفة التقديرية: "+(job.credits_charged??"تُحدّد من المزود")+" رصيد";
+  const job=await call("/api/video/generate",{method:"POST",body:JSON.stringify({prompt:$("prompt").value.trim(),duration:Number($("duration").value),aspect_ratio:$("ratio").value})});
+  detail.textContent="رقم المهمة: "+job.project_id+" · المحرك: LTX-Video";
   await poll(job.project_id);
  }catch(error){show(error.message,true);button.disabled=false;button.textContent="إنشاء الفيديو"}
 });
 async function poll(id){
  try{
   const data=await call("/api/video/status/"+encodeURIComponent(id));
-  const labels={queued:"الفيديو في قائمة الانتظار...",rendering:"جارٍ توليد الفيديو...",complete:"اكتمل توليد الفيديو.",error:"فشل توليد الفيديو.",canceled:"تم إلغاء المهمة."};
-  show(labels[data.status]||("حالة المهمة: "+data.status),data.status==="error"||data.status==="canceled");
+  const labels={queued:"تم إدراج الفيديو في طابور GPU المجاني...",running:"النموذج يعمل على إنشاء الفيديو...",complete:"اكتمل توليد الفيديو.",error:"تعذر توليد الفيديو."};
+  show(labels[data.status]||("حالة المهمة: "+data.status),data.status==="error");
   if(data.status==="complete"&&data.video_url){
-   video.src=data.video_url;video.hidden=false;download.href=data.video_url;download.hidden=false;detail.textContent="اكتمل الفيديو. قد يكون رابط التنزيل مؤقتاً؛ حمّله الآن.";
+   video.src=data.video_url;video.hidden=false;download.href=data.video_url;download.hidden=false;detail.textContent="اكتمل الفيديو. رابط التنزيل من مساحة النموذج وقد يكون مؤقتاً؛ حمّله الآن.";
    button.disabled=false;button.textContent="إنشاء فيديو آخر";return;
   }
-  if(data.status==="error"||data.status==="canceled"){
-   detail.textContent=typeof data.error==="string"?data.error:"تعذر إكمال المهمة. راجع رصيد المزود وسجلات الخادم.";
+  if(data.status==="error"){
+   detail.textContent=data.error||"قد تكون مساحة النموذج متوقفة أو مشغولة. أعد المحاولة لاحقاً.";
    button.disabled=false;button.textContent="إعادة المحاولة";return;
   }
   pollTimer=setTimeout(()=>poll(id),6000);
