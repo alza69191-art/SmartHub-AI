@@ -187,6 +187,7 @@ def get_qwen_client():
         _qwen_client = Client(
             "Qwen/Qwen-Image-2.1",
             token=token,
+            httpx_kwargs={"timeout": 600},
             verbose=False,
         )
     return _qwen_client
@@ -333,7 +334,7 @@ async def generate_image(payload: ImageGenerateRequest, user=Depends(current_use
         logger.exception("Qwen Image 2.1 generation failed")
         raise HTTPException(
             status_code=502,
-            detail="تعذر توليد الصورة حالياً. تحقق من حالة Hugging Face Space وسجلات Render.",
+            detail="فشل اتصال Qwen: " + type(exc).__name__ + ". راجع سجلات Render لمعرفة السبب التفصيلي.",
         )
 
 def require_admin(user=Depends(current_user)):
