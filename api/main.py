@@ -137,6 +137,7 @@ def health():
             "groq": bool(os.getenv("GROQ_API_KEY")),
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "huggingface": bool(os.getenv("HF_TOKEN")),
+            "magic_hour_video": bool(os.getenv("MAGIC_HOUR_API_KEY")),
         },
     }
 
