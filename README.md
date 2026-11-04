@@ -61,3 +61,26 @@ Passwords are stored as salted scrypt hashes; plaintext passwords are never stor
 After setting these variables, redeploy the Render API. Create the administrator account using an address listed in `ADMIN_EMAILS` and enter `ADMIN_SETUP_KEY` in the admin setup field. Other registrations receive the regular user role. Do not share the setup key.
 
 This first release does not yet include email verification, password reset, or automated abuse/rate limiting. Do not treat it as a fully hardened production identity system until those controls are added. The browser keeps the bearer token in session storage for the current tab.
+
+## Magic Hour text-to-video integration
+
+The SmartHub video generator is available at `video-generator.html` and uses the FastAPI backend; the Magic Hour secret must never be placed in browser code.
+
+### Requirements
+- Render environment variable `MAGIC_HOUR_API_KEY` containing a valid Magic Hour API key.
+- Existing SmartHub authentication configuration: `JWT_SECRET`, database connection, and a signed-in user.
+- Existing backend dependencies: `fastapi`, `requests`, and `uvicorn` from `api/requirements.txt`. No additional Python package is required for the raw HTTP integration.
+- `config.js` must point `SMART_HUB_API_URL` to the deployed Render API.
+- The Magic Hour account must have sufficient API credits and access to the selected generation options.
+
+### Usage
+1. Sign in to SmartHub.
+2. Open `video-generator.html` from the Tools page.
+3. Enter a prompt, choose 5, 8, or 10 seconds and an aspect ratio.
+4. Submit the job. SmartHub polls the provider project until it completes, then displays the video and download link.
+
+API routes:
+- `POST /api/video/generate` — creates a text-to-video job.
+- `GET /api/video/status/{project_id}` — checks job status and retrieves the output URL.
+
+The integration starts at 480p and leaves model selection to the provider default. Generation is asynchronous and consumes Magic Hour account credits; a configured API key alone does not guarantee free credits or successful generation. Never commit the API key to GitHub or share it in screenshots.
