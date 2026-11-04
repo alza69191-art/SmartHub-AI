@@ -448,3 +448,90 @@ def update_ticket_status(ticket_id: int,status: str,user=Depends(require_admin))
             result=cur.fetchone()
             if not result: raise HTTPException(status_code=404,detail="التذكرة غير موجودة")
             return result
+
+
+
+# Magic Hour text-to-video provider. The provider key is kept only on Render.
+class VideoGenerateRequest(BaseModel):
+    prompt: str = Field(min_length=5, max_length=4000)
+    duration: int = Field(default=5, ge=1, le=60)
+    aspect_ratio: str = Field(default="16:9", pattern="^(16:9|9:16|1:1)$")
+    model: str = Field(default="default", pattern="^(default|ltx-2.5|wan-2.2|wan-3.0|kling-3.0|veo3.1-lite)$")
+    resolution: str = Field(default="480p", pattern="^(480p|720p|1080p)$")
+
+
+def magic_hour_request(method, path, payload=None):
+    key = os.getenv("MAGIC_HOUR_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(status_code=503, detail="مزود الفيديو غير مهيأ بعد. أضف MAGIC_HOUR_API_KEY في Render.")
+    try:
+        response = requests.request(
+            method,
+            "https://api.magichour.ai" + path,
+            headers={"Authorization": "Bearer " + key, "Accept": "application/json"},
+            json=payload,
+            timeout=45,
+        )
+    except requests.RequestException:
+        logger.exception("Magic Hour network request failed")
+        raise HTTPException(status_code=502, detail="تعذر الاتصال بمزود الفيديو حالياً.")
+    if response.status_code >= 400:
+        try:
+            data = response.json()
+        except ValueError:
+            data = {}
+        code = data.get("code", "provider_error")
+        message = data.get("message", "Video provider request failed")
+        logger.warning("Magic Hour returned %s (%s)", response.status_code, code)
+        if response.status_code == 402:
+            raise HTTPException(status_code=402, detail="رصيد Magic Hour المجاني غير كافٍ لهذا الطلب.")
+        if response.status_code == 401:
+            raise HTTPException(status_code=502, detail="مفتاح Magic Hour غير صالح. راجعه في Render.")
+        raise HTTPException(status_code=502, detail="رفض مزود الفيديو الطلب: " + str(message)[:240])
+    try:
+        return response.json()
+    except ValueError:
+        raise HTTPException(status_code=502, detail="أعاد مزود الفيديو استجابة غير مفهومة.")
+
+
+@app.post("/api/video/generate")
+async def generate_video(payload: VideoGenerateRequest, user=Depends(current_user)):
+    body = {
+        "end_seconds": payload.duration,
+        "aspect_ratio": payload.aspect_ratio,
+        "style": {"prompt": payload.prompt},
+        "model": payload.model,
+        "resolution": payload.resolution,
+        "name": "SmartHub video",
+    }
+    # Do not allow paid/high-cost options while the user is testing the free provider.
+    if payload.model == "default":
+        body["resolution"] = "480p"
+    result = await run_in_threadpool(magic_hour_request, "POST", "/v1/text-to-video", body)
+    project_id = result.get("id")
+    if not project_id:
+        raise HTTPException(status_code=502, detail="لم يُرجع مزود الفيديو رقم المهمة.")
+    logger.info("Magic Hour video job %s created for user %s", project_id, user["id"])
+    return {
+        "project_id": project_id,
+        "status": "queued",
+        "credits_charged": result.get("credits_charged"),
+        "provider": "Magic Hour",
+    }
+
+
+@app.get("/api/video/status/{project_id}")
+async def video_status(project_id: str, user=Depends(current_user)):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{5,100}", project_id):
+        raise HTTPException(status_code=422, detail="رقم المهمة غير صالح.")
+    result = await run_in_threadpool(
+        magic_hour_request, "GET", "/v1/video-projects/" + project_id
+    )
+    downloads = result.get("downloads") or []
+    return {
+        "project_id": result.get("id", project_id),
+        "status": result.get("status", "unknown"),
+        "video_url": downloads[0].get("url") if downloads else None,
+        "credits_charged": result.get("credits_charged"),
+        "error": result.get("error"),
+    }
