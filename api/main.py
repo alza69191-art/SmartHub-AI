@@ -539,6 +539,8 @@ def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
             for raw_line in response.iter_lines(decode_unicode=True):
                 if not raw_line:
                     continue
+                if isinstance(raw_line, bytes):
+                    raw_line = raw_line.decode("utf-8", "replace")
                 line = raw_line.strip()
                 if line.startswith("event:"):
                     event_name = line.split(":", 1)[1].strip()
