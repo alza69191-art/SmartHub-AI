@@ -18,14 +18,14 @@
 <body>
 <header class="site-header"><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><nav class="top-nav"><a class="top-link" href="index.html">الرئيسية</a><a class="top-link" href="tools.html">الأدوات</a><a class="top-link" href="assistant.html">المساعد الذكي</a><a class="top-link" href="support.html">الدعم الفني</a></nav><div class="header-actions"><a class="register-nav-button" href="account.html">الحساب</a></div></header>
 <main class="standalone-page"><section class="video-shell">
-<small>SMART MEDIA STUDIO · TEXT TO VIDEO</small><h1>مولّد الفيديو بالذكاء الاصطناعي</h1>
-<p>أنشئ مقطعاً من وصف نصي باستخدام مزود Magic Hour. يبدأ الاختبار بالنموذج الافتراضي المجاني المتاح لحساب المزود (LTX-2.5 عادةً) وبدقة 480p.</p>
+<small>SMART MEDIA STUDIO · LTX-VIDEO OPEN MODEL</small><h1>مولّد الفيديو بالذكاء الاصطناعي</h1>
+<p>أنشئ مقطع فيديو من وصفك النصي باستخدام نموذج LTX-Video المفتوح عبر مساحة تشغيل عامة مجانية.</p>
 <form id="videoForm"><div class="video-grid">
 <label style="grid-column:1/-1">وصف الفيديو</label><textarea id="prompt" minlength="5" maxlength="4000" required placeholder="صف المشهد والحركة والإضاءة وزاوية الكاميرا بالتفصيل..."></textarea>
-<div><label for="duration">المدة</label><select id="duration"><option value="5">5 ثوانٍ</option><option value="8">8 ثوانٍ</option><option value="10">10 ثوانٍ</option></select></div>
+<div><label for="duration">المدة</label><select id="duration"><option value="5">5 ثوانٍ</option><option value="8">8 ثوانٍ</option></select></div>
 <div><label for="ratio">نسبة الأبعاد</label><select id="ratio"><option value="16:9">أفقي 16:9</option><option value="9:16">عمودي 9:16</option><option value="1:1">مربع 1:1</option></select></div>
-</div><div class="video-actions"><button class="action" id="generate" type="submit">إنشاء الفيديو</button><a class="action alt" href="https://magichour.ai/developer" target="_blank" rel="noopener">الحصول على مفتاح API</a></div></form>
-<p class="video-hint">يتطلب تسجيل الدخول إلى SmartHub. لا تضع مفتاح المزود هنا؛ يُحفظ سرياً في Render. رصيد API التجريبي محدود وقد تختلف الأهلية والرصيد حسب الحساب. لا نبدأ التوليد قبل ضبط المفتاح.</p>
+</div><div class="video-actions"><button class="action" id="generate" type="submit">إنشاء الفيديو</button></div></form>
+<p class="video-hint">يتطلب تسجيل الدخول إلى SmartHub. لا تحتاج إلى مفتاح فيديو أو اشتراك مدفوع. يعتمد التوليد على طابور GPU عام؛ قد يتأخر أو يتوقف مؤقتاً عند الضغط.</p>
 <div id="result" class="video-result" aria-live="polite"><p id="status" class="video-status"></p><p id="detail" class="video-hint"></p><video id="output" controls playsinline hidden></video><a id="download" class="action" hidden download="smarthub-video.mp4">تحميل الفيديو</a></div>
 </section></main>
 <footer><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><span>© 2026 SmartHub AI</span><span>SmartHub Media Studio</span></footer>
