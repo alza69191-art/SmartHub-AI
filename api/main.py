@@ -248,18 +248,6 @@ def generate_qwen_image(payload):
             "enhanced_prompt": prepared[2] or "",
         }
 
-@app.post("/api/images/generate")
-async def generate_image(payload: ImageGenerateRequest, user=Depends(current_user)):
-    try:
-        result = await run_in_threadpool(generate_qwen_image, payload)
-        logger.info("Qwen image generated for user %s", user["id"])
-        return result
-    except Exception as exc:
-        logger.exception("Qwen Image 2.1 generation failed")
-        raise HTTPException(
-            status_code=502,
-            detail="تعذر توليد الصورة حالياً. تحقق من حالة Hugging Face Space وسجلات Render.",
-        )
 
 # Authentication and support API
 bearer = HTTPBearer(auto_error=False)
@@ -334,6 +322,19 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     if not user:
         raise HTTPException(status_code=401, detail="الحساب غير موجود")
     return user
+
+@app.post("/api/images/generate")
+async def generate_image(payload: ImageGenerateRequest, user=Depends(current_user)):
+    try:
+        result = await run_in_threadpool(generate_qwen_image, payload)
+        logger.info("Qwen image generated for user %s", user["id"])
+        return result
+    except Exception as exc:
+        logger.exception("Qwen Image 2.1 generation failed")
+        raise HTTPException(
+            status_code=502,
+            detail="تعذر توليد الصورة حالياً. تحقق من حالة Hugging Face Space وسجلات Render.",
+        )
 
 def require_admin(user=Depends(current_user)):
     if user["role"] != "admin":
