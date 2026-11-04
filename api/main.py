@@ -226,12 +226,15 @@ def generate_qwen_image(payload):
             randomize_seed=True,
             api_name="/prepare_request",
         )
-        if not isinstance(prepared, (tuple, list)) or len(prepared) < 4:
-            raise RuntimeError("Unexpected response from Qwen prepare stage")
-        request_state = prepared[3]
+        # gradio_client excludes gr.State outputs and manages state internally
+        # for the same Client session. The visible prepare outputs are:
+        # placeholder image, seed, and rewritten prompt.
+        if not isinstance(prepared, (tuple, list)) or len(prepared) < 3:
+            raise RuntimeError(
+                f"Unexpected Qwen prepare response: {type(prepared).__name__}"
+            )
         actual_seed = prepared[1]
         image_result = client.predict(
-            request_state=request_state,
             original_prompt=payload.prompt,
             enable_extend=payload.enhance_prompt,
             custom_size=payload.custom_size,
