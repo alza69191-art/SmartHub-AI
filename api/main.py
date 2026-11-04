@@ -137,7 +137,7 @@ def health():
             "groq": bool(os.getenv("GROQ_API_KEY")),
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "huggingface": bool(os.getenv("HF_TOKEN")),
-            "magic_hour_video": bool(os.getenv("MAGIC_HOUR_API_KEY")),
+            "ltx_video_public": True,
         },
     }
 
@@ -452,99 +452,154 @@ def update_ticket_status(ticket_id: int,status: str,user=Depends(require_admin))
 
 
 
-# Magic Hour text-to-video provider. The provider key is kept only on Render.
+# Free public LTX-Video model hosted on Hugging Face Spaces.
+# No paid video-provider account or API key is required. An optional HF_TOKEN
+# can improve public Space rate limits, but anonymous requests are supported.
+LTX_SPACE_URL = "https://lightricks-ltx-video-distilled.hf.space"
+_video_jobs = {}
+_video_jobs_lock = threading.Lock()
+
+
 class VideoGenerateRequest(BaseModel):
     prompt: str = Field(min_length=5, max_length=4000)
-    duration: int = Field(default=5, ge=1, le=60)
+    duration: float = Field(default=5, ge=0.3, le=8.5)
     aspect_ratio: str = Field(default="16:9", pattern="^(16:9|9:16|1:1)$")
-    model: str = Field(default="default", pattern="^(default|ltx-2.5|wan-2.2|wan-3.0|kling-3.0|veo3.1-lite)$")
-    resolution: str = Field(default="480p", pattern="^(480p|720p|1080p)$")
 
 
-def magic_hour_request(method, path, payload=None):
-    key = os.getenv("MAGIC_HOUR_API_KEY", "").strip()
-    if not key:
-        raise HTTPException(status_code=503, detail="مزود الفيديو غير مهيأ بعد. أضف MAGIC_HOUR_API_KEY في Render.")
+def _ltx_headers():
+    headers = {"Content-Type": "application/json"}
+    token = os.getenv("HF_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    return headers
+
+
+def _extract_ltx_video(payload):
+    if isinstance(payload, list) and payload:
+        payload = payload[0]
+    if isinstance(payload, dict):
+        video = payload.get("video", payload)
+        if isinstance(video, dict):
+            return video.get("url") or video.get("path")
+        if isinstance(video, str):
+            return video
+    if isinstance(payload, str) and payload.startswith(("http://", "https://")):
+        return payload
+    return None
+
+
+def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
     try:
-        response = requests.request(
-            method,
-            "https://api.magichour.ai" + path,
-            headers={"Authorization": "Bearer " + key, "Accept": "application/json"},
-            json=payload,
+        dimensions = {
+            "16:9": (432, 768),
+            "9:16": (768, 432),
+            "1:1": (512, 512),
+        }
+        height, width = dimensions[aspect_ratio]
+        # Arguments follow the public Lightricks Space text_to_video API.
+        data = [
+            prompt,
+            "worst quality, blurry, distorted, watermark",
+            "",
+            "",
+            height,
+            width,
+            "text-to-video",
+            float(duration),
+            9,
+            42,
+            True,
+            1,
+            True,
+        ]
+        submit = requests.post(
+            LTX_SPACE_URL + "/gradio_api/call/text_to_video",
+            headers=_ltx_headers(),
+            json={"data": data},
             timeout=45,
         )
-    except requests.RequestException:
-        logger.exception("Magic Hour network request failed")
-        raise HTTPException(status_code=502, detail="تعذر الاتصال بمزود الفيديو حالياً.")
-    if response.status_code >= 400:
-        try:
-            data = response.json()
-        except ValueError:
-            data = {}
-        code = data.get("code", "provider_error")
-        message = data.get("message", "Video provider request failed")
-        logger.warning("Magic Hour returned %s (%s)", response.status_code, code)
-        if response.status_code == 402:
-            raise HTTPException(status_code=402, detail="رصيد Magic Hour المجاني غير كافٍ لهذا الطلب.")
-        if response.status_code == 401:
-            raise HTTPException(status_code=502, detail="مفتاح Magic Hour غير صالح. راجعه في Render.")
-        raise HTTPException(status_code=502, detail="رفض مزود الفيديو الطلب: " + str(message)[:240])
-    try:
-        return response.json()
-    except ValueError:
-        raise HTTPException(status_code=502, detail="أعاد مزود الفيديو استجابة غير مفهومة.")
+        submit.raise_for_status()
+        event_id = submit.json().get("event_id")
+        if not event_id:
+            raise RuntimeError("لم يُرجع نموذج الفيديو رقم المهمة.")
+
+        with _video_jobs_lock:
+            if job_id in _video_jobs:
+                _video_jobs[job_id]["status"] = "running"
+
+        with requests.get(
+            LTX_SPACE_URL + "/gradio_api/call/text_to_video/" + event_id,
+            headers=_ltx_headers(),
+            stream=True,
+            timeout=(20, 300),
+        ) as response:
+            response.raise_for_status()
+            event_name = None
+            for raw_line in response.iter_lines(decode_unicode=True):
+                if not raw_line:
+                    continue
+                line = raw_line.strip()
+                if line.startswith("event:"):
+                    event_name = line.split(":", 1)[1].strip()
+                elif line.startswith("data:") and event_name in ("complete", "error"):
+                    raw_data = line.split(":", 1)[1].strip()
+                    if event_name == "error":
+                        raise RuntimeError("تعذر على النموذج إكمال التوليد.")
+                    result = json.loads(raw_data)
+                    video_url = _extract_ltx_video(result)
+                    if not video_url:
+                        raise RuntimeError("أعاد النموذج نتيجة دون رابط فيديو.")
+                    with _video_jobs_lock:
+                        if job_id in _video_jobs:
+                            _video_jobs[job_id].update({
+                                "status": "complete",
+                                "video_url": video_url,
+                                "error": None,
+                            })
+                    return
+
+        raise RuntimeError("انتهى اتصال النموذج قبل وصول الفيديو.")
+    except Exception as exc:
+        logger.exception("Public LTX video generation failed for job %s", job_id)
+        with _video_jobs_lock:
+            if job_id in _video_jobs:
+                _video_jobs[job_id].update({
+                    "status": "error",
+                    "error": str(exc)[:400],
+                })
 
 
 @app.post("/api/video/generate")
-async def generate_video(payload: VideoGenerateRequest, user=Depends(current_user)):
-    body = {
-        "end_seconds": float(payload.duration),
-        "aspect_ratio": payload.aspect_ratio,
-        "style": {"prompt": payload.prompt},
-        "resolution": "480p",
-        "name": "SmartHub video",
-    }
-    # Omit model unless a verified model ID is explicitly selected. This lets
-    # Magic Hour apply its account-supported default instead of sending
-    # the literal string "default" as a model identifier.
-    if payload.model != "default":
-        body["model"] = payload.model
-    result = await run_in_threadpool(magic_hour_request, "POST", "/v1/text-to-video", body)
-    project_id = result.get("id")
-    if not project_id:
-        raise HTTPException(status_code=502, detail="لم يُرجع مزود الفيديو رقم المهمة.")
-    logger.info("Magic Hour video job %s created for user %s", project_id, user["id"])
-    return {
-        "project_id": project_id,
-        "status": "queued",
-        "credits_charged": result.get("credits_charged"),
-        "provider": "Magic Hour",
-    }
+def generate_video(payload: VideoGenerateRequest, user=Depends(current_user)):
+    job_id = uuid.uuid4().hex
+    with _video_jobs_lock:
+        _video_jobs[job_id] = {
+            "owner_id": str(user["id"]),
+            "status": "queued",
+            "video_url": None,
+            "error": None,
+        }
+    worker = threading.Thread(
+        target=_run_ltx_video_job,
+        args=(job_id, payload.prompt.strip(), payload.duration, payload.aspect_ratio, str(user["id"])),
+        daemon=True,
+    )
+    worker.start()
+    logger.info("Public LTX video job %s queued for user %s", job_id, user["id"])
+    return {"project_id": job_id, "status": "queued", "provider": "LTX-Video"}
 
 
 @app.get("/api/video/status/{project_id}")
-async def video_status(project_id: str, user=Depends(current_user)):
-    if not re.fullmatch(r"[A-Za-z0-9_-]{5,100}", project_id):
+def video_status(project_id: str, user=Depends(current_user)):
+    if not re.fullmatch(r"[A-Fa-f0-9]{32}", project_id):
         raise HTTPException(status_code=422, detail="رقم المهمة غير صالح.")
-    result = await run_in_threadpool(
-        magic_hour_request, "GET", "/v1/video-projects/" + project_id
-    )
-    # API responses may expose a singular download object or a downloads
-    # collection depending on the endpoint/API version.
-    download = result.get("download")
-    downloads = result.get("downloads") or []
-    video_url = None
-    if isinstance(download, dict):
-        video_url = download.get("url")
-    elif isinstance(download, str):
-        video_url = download
-    if not video_url and downloads:
-        first = downloads[0]
-        video_url = first.get("url") if isinstance(first, dict) else first
-    return {
-        "project_id": result.get("id", project_id),
-        "status": result.get("status", "unknown"),
-        "video_url": video_url,
-        "credits_charged": result.get("credits_charged"),
-        "error": result.get("error"),
-    }
+    with _video_jobs_lock:
+        job = _video_jobs.get(project_id)
+        if not job or job["owner_id"] != str(user["id"]):
+            raise HTTPException(status_code=404, detail="المهمة غير موجودة أو لا تملك صلاحية الوصول إليها.")
+        return {
+            "project_id": project_id,
+            "status": job["status"],
+            "video_url": job["video_url"],
+            "error": job["error"],
+        }
