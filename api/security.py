@@ -18,6 +18,10 @@ class RequestSecurityMiddleware(BaseHTTPMiddleware):
             "/api/auth/google": 12,
             "/api/detector/text": 5,
             "/api/media": 6,
+            "/api/chat": 20,
+            "/api/images/generate": 3,
+            "/api/images/edit": 3,
+            "/api/video/generate": 2,
         }
 
     def secure(self, response, request):
