@@ -316,5 +316,5 @@ main,footer{margin-right:0}
 
 
 /* Remember-me control on the sign-in form */
-.remember-option{display:flex;align-items:center;gap:.65rem;margin:.35rem 0 1rem;font-size:.92rem;color:var(--muted,#aab2c5);cursor:pointer}
+.auth-card label.remember-option{display:flex;align-items:center;gap:.65rem;margin:.35rem 0 1rem;font-size:.92rem;color:var(--muted,#aab2c5);cursor:pointer}
 .remember-option input[type=checkbox]{width:1rem;height:1rem;margin:0;accent-color:var(--accent,#8b7cff);flex:0 0 auto}
