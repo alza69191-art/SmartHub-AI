@@ -3,6 +3,7 @@ import json
 import os
 import base64
 import threading
+import time
 import re
 import uuid
 import hashlib
@@ -12,28 +13,31 @@ from datetime import datetime, timedelta, timezone
 
 import psycopg
 from psycopg.rows import dict_row
-from jose import jwt, JWTError
+import jwt
 from fastapi import Depends
 from starlette.concurrency import run_in_threadpool
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from groq import Groq
 from database import initialize_database, database_is_ready
+from security import install_security
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("smarthub")
 
-app = FastAPI(title="SmartHub AI API", version="1.1.0")
+app = FastAPI(title="SmartHub AI API", version="1.2.0")
+install_security(app)
 
-frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "https://alza69191-art.github.io")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in frontend_origin.split(",")],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -47,6 +51,10 @@ def startup():
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     history: list[dict] = Field(default_factory=list)
+
+class AITextDetectRequest(BaseModel):
+    text: str = Field(min_length=100, max_length=12000)
+    language: str = Field(default="auto", pattern="^(auto|ar|en)$")
 
 def build_messages(payload):
     messages = [{
@@ -89,7 +97,7 @@ def ask_gemini(messages):
             })
     response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        params={"key": key},
+        headers={"x-goog-api-key": key},
         json={
             "systemInstruction": {"parts": [{"text": system_text}]},
             "contents": contents,
@@ -144,6 +152,52 @@ def health():
             "ltx_video_public": True,
         },
     }
+
+@app.post("/api/detector/text")
+def detect_ai_text(payload: AITextDetectRequest):
+    text_value = payload.text.strip()
+    if len(text_value.split()) < 50:
+        raise HTTPException(status_code=422, detail="النص قصير جداً. أدخل 50 كلمة على الأقل لتقليل النتائج المضللة.")
+    token = os.getenv("HF_TOKEN", "").strip()
+    if not token:
+        raise HTTPException(status_code=503, detail="كاشف النص يحتاج HF_TOKEN على الخادم. لم يتم إرسال النص إلى أي مزود.")
+    language = payload.language
+    if language == "auto":
+        arabic_chars = sum("\u0600" <= ch <= "\u06ff" for ch in text_value)
+        language = "ar" if arabic_chars / max(1, len(text_value)) > 0.12 else "en"
+    model = os.getenv("AI_DETECTOR_MODEL_AR" if language == "ar" else "AI_DETECTOR_MODEL_EN", "Rashidbm/farras-xlmr-arabic-ai-detector" if language == "ar" else "Hello-SimpleAI/chatgpt-detector-roberta").strip()
+    if not model:
+        raise HTTPException(status_code=503, detail="لم يتم ضبط نموذج الكشف لهذه اللغة على الخادم.")
+    try:
+        response = requests.post(
+            "https://router.huggingface.co/hf-inference/models/" + model,
+            headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+            json={"inputs": text_value, "options": {"wait_for_model": True}},
+            timeout=90,
+        )
+        if response.status_code == 503:
+            raise HTTPException(status_code=503, detail="نموذج الكشف قيد التحميل أو غير متاح حالياً. حاول لاحقاً.")
+        response.raise_for_status()
+        result = response.json()
+        predictions = result[0] if isinstance(result, list) and result and isinstance(result[0], list) else result
+        if not isinstance(predictions, list) or not all(isinstance(x, dict) for x in predictions):
+            raise RuntimeError("Unexpected model response")
+        return {
+            "status": "model_response",
+            "language": language,
+            "model": model,
+            "predictions": [{"label": str(x.get("label", "unknown"))[:80], "score": float(x.get("score", 0))} for x in predictions[:10]],
+            "notice": "مؤشر احتمالي تجريبي وليس إثباتاً لمصدر النص. لا تستخدمه لاتخاذ قرار عقابي أو عالي المخاطر.",
+        }
+    except HTTPException:
+        raise
+    except requests.RequestException as exc:
+        logger.warning("AI detector provider request failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="تعذر الوصول إلى نموذج الكشف. تحقق من توفر النموذج وحصة Hugging Face.")
+    except Exception:
+        logger.exception("AI detector response could not be parsed")
+        raise HTTPException(status_code=502, detail="أعاد مزود الكشف استجابة غير متوقعة.")
+
 
 @app.post("/api/chat")
 def chat(payload: ChatRequest):
@@ -206,7 +260,7 @@ def call_gemini_image(parts):
         raise RuntimeError("GEMINI_API_KEY is not configured")
     response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent",
-        params={"key": key},
+        headers={"x-goog-api-key": key},
         json={
             "contents": [{"parts": parts}],
             "generationConfig": {"responseModalities": ["IMAGE"]},
@@ -336,11 +390,18 @@ class RegisterRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=10, max_length=128)
     display_name: str = Field(min_length=2, max_length=80)
-    admin_setup_key: str = Field(default="", max_length=200)
 
 class LoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=1, max_length=128)
+
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=20, max_length=10000)
+
+class ImageUploadRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=160)
+    mime_type: str = Field(pattern="^(image/png|image/jpeg|image/webp)$")
+    image_base64: str = Field(min_length=100, max_length=7000000)
 
 class TicketRequest(BaseModel):
     subject: str = Field(min_length=3, max_length=200)
@@ -400,6 +461,86 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     if not user:
         raise HTTPException(status_code=401, detail="الحساب غير موجود")
     return user
+
+
+@app.post("/api/media")
+def upload_image_link(payload: ImageUploadRequest, request: Request, user=Depends(current_user)):
+    try:
+        raw = base64.b64decode(payload.image_base64, validate=True)
+    except Exception:
+        raise HTTPException(status_code=422, detail="بيانات الصورة غير صالحة.")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="الحد الأقصى للصورة 5 ميغابايت.")
+    signatures = {
+        "image/png": raw.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg": raw.startswith(b"\xff\xd8\xff"),
+        "image/webp": len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP",
+    }
+    if not signatures.get(payload.mime_type, False):
+        raise HTTPException(status_code=415, detail="امتداد الصورة لا يطابق محتواها الفعلي.")
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", payload.file_name)[:120] or "image"
+    asset_id = str(uuid.uuid4())
+    try:
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(user["id"]),))
+                cur.execute("DELETE FROM image_assets WHERE expires_at < NOW()")
+                cur.execute(
+                    "SELECT COUNT(*) AS total, COALESCE(SUM(octet_length(data)),0) AS used_bytes FROM image_assets WHERE user_id=%s AND expires_at>NOW()",
+                    (str(user["id"]),),
+                )
+                quota = cur.fetchone()
+                if quota["total"] >= 10 or quota["used_bytes"] + len(raw) > 25 * 1024 * 1024:
+                    raise HTTPException(status_code=429, detail="وصلت إلى حد المشاركة: 10 صور أو 25 ميغابايت نشطة لكل حساب.")
+                cur.execute(
+                    """INSERT INTO image_assets (id,user_id,file_name,content_type,data,expires_at)
+                       VALUES (%s,%s,%s,%s,%s,NOW()+INTERVAL '30 days') RETURNING expires_at""",
+                    (asset_id, str(user["id"]), safe_name, payload.mime_type, psycopg.Binary(raw)),
+                )
+                expires_at = cur.fetchone()["expires_at"]
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Image share upload failed")
+        raise HTTPException(status_code=503, detail="تعذر حفظ الصورة. تحقق من قاعدة البيانات.")
+    return {"url": str(request.base_url).rstrip("/") + "/api/media/" + asset_id,
+            "expires_at": expires_at.isoformat(), "retention_days": 30,
+            "notice": "الرابط عام لمن يمتلكه وينتهي بعد 30 يوماً."}
+
+
+@app.get("/api/media/{asset_id}")
+def get_shared_image(asset_id: str):
+    try:
+        asset_uuid = str(uuid.UUID(asset_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="الصورة غير موجودة.")
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT file_name,content_type,data FROM image_assets WHERE id=%s AND expires_at>NOW()", (asset_uuid,))
+            asset = cur.fetchone()
+    if not asset:
+        raise HTTPException(status_code=404, detail="الرابط غير موجود أو انتهت صلاحيته.")
+    return Response(content=bytes(asset["data"]), media_type=asset["content_type"],
+                    headers={"Content-Disposition": "inline; filename=shared-image",
+                             "Cache-Control": "no-store",
+                             "X-Content-Type-Options": "nosniff"})
+
+
+@app.delete("/api/media/{asset_id}")
+def delete_shared_image(asset_id: str, user=Depends(current_user)):
+    try:
+        asset_uuid = str(uuid.UUID(asset_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="الصورة غير موجودة.")
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM image_assets WHERE id=%s AND user_id=%s RETURNING id",
+                        (asset_uuid, str(user["id"])))
+            deleted = cur.fetchone()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="الصورة غير موجودة أو لا تملك صلاحية حذفها.")
+    return {"deleted": True}
+
 
 @app.post("/api/images/edit")
 async def edit_image(payload: ImageEditRequest, user=Depends(current_user)):
@@ -461,9 +602,7 @@ def register(payload: RegisterRequest):
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=422, detail="البريد الإلكتروني غير صالح")
     user_id = uuid.uuid4()
-    setup_key = os.getenv("ADMIN_SETUP_KEY", "")
-    is_admin = bool(setup_key) and admin_email(email) and hmac.compare_digest(payload.admin_setup_key, setup_key)
-    role = "admin" if is_admin else "user"
+    role = "user"
     try:
         with db_connect() as conn:
             with conn.cursor() as cur:
@@ -475,6 +614,54 @@ def register(payload: RegisterRequest):
     except psycopg.errors.UniqueViolation:
         raise HTTPException(status_code=409, detail="هذا البريد مسجل مسبقاً")
     return {"token": make_token(profile), "user": profile}
+
+@app.post("/api/auth/google")
+def google_login(payload: GoogleLoginRequest):
+    ensure_auth_config()
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    if not client_id:
+        raise HTTPException(status_code=503, detail="تسجيل Google غير مهيأ على الخادم")
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+        claims = id_token.verify_oauth2_token(payload.credential, google_requests.Request(), client_id, clock_skew_in_seconds=10)
+        if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com") or claims.get("email_verified") is not True:
+            raise ValueError("Untrusted Google identity")
+        subject = str(claims["sub"])
+        email = str(claims["email"]).strip().lower()
+        display_name = str(claims.get("name") or email.split("@")[0])[:80]
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise ValueError("Invalid email")
+    except Exception:
+        logger.warning("Google sign-in token verification failed")
+        raise HTTPException(status_code=401, detail="تعذر التحقق من حساب Google. حاول مجدداً.")
+    try:
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id,email,display_name,role,created_at FROM profiles WHERE auth_subject=%s", ("google:" + subject,))
+                profile = cur.fetchone()
+                if not profile:
+                    cur.execute("SELECT id,email,display_name,role,created_at FROM profiles WHERE LOWER(email)=LOWER(%s)", (email,))
+                    profile = cur.fetchone()
+                if profile:
+                    cur.execute("""UPDATE profiles SET auth_subject=%s,email=%s,
+                                   display_name=COALESCE(NULLIF(display_name,''),%s)
+                                   WHERE id=%s RETURNING id,email,display_name,role,created_at""",
+                                ("google:" + subject,email,display_name,str(profile["id"])))
+                else:
+                    cur.execute("""INSERT INTO profiles (id,auth_subject,email,display_name,role)
+                                   VALUES (%s,%s,%s,%s,'user') RETURNING id,email,display_name,role,created_at""",
+                                (str(uuid.uuid4()),"google:" + subject,email,display_name))
+                profile = cur.fetchone()
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(status_code=409, detail="هذا الحساب مرتبط مسبقاً بحساب آخر")
+    if profile["role"] == "admin" and not admin_email(email):
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE profiles SET role='user' WHERE id=%s RETURNING id,email,display_name,role,created_at", (str(profile["id"]),))
+                profile = cur.fetchone()
+    return {"token": make_token(profile), "user": profile}
+
 
 @app.post("/api/auth/login")
 def login(payload: LoginRequest):
@@ -566,6 +753,28 @@ def update_ticket_status(ticket_id: int,status: str,user=Depends(require_admin))
 LTX_SPACE_URL = "https://lightricks-ltx-video-distilled.hf.space"
 _video_jobs = {}
 _video_jobs_lock = threading.Lock()
+_VIDEO_JOB_TTL_SECONDS = 6 * 60 * 60
+_VIDEO_MAX_ACTIVE_GLOBAL = 4
+_VIDEO_MAX_ACTIVE_PER_USER = 1
+
+
+def _prune_video_jobs(now=None):
+    now = now or time.time()
+    expired = [
+        job_id for job_id, job in _video_jobs.items()
+        if job.get("status") in {"complete", "error"}
+        and now - job.get("updated_at", job.get("created_at", now)) > _VIDEO_JOB_TTL_SECONDS
+    ]
+    for job_id in expired:
+        _video_jobs.pop(job_id, None)
+    if len(_video_jobs) > 100:
+        terminal = sorted(
+            ((job.get("updated_at", job.get("created_at", now)), job_id)
+             for job_id, job in _video_jobs.items()
+             if job.get("status") in {"complete", "error"})
+        )
+        for _, job_id in terminal[:max(0, len(_video_jobs) - 80)]:
+            _video_jobs.pop(job_id, None)
 
 
 class VideoGenerateRequest(BaseModel):
@@ -633,7 +842,7 @@ def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
 
         with _video_jobs_lock:
             if job_id in _video_jobs:
-                _video_jobs[job_id]["status"] = "running"
+                _video_jobs[job_id].update({"status": "running", "updated_at": time.time()})
 
         with requests.get(
             LTX_SPACE_URL + "/gradio_api/call/text_to_video/" + event_id,
@@ -665,6 +874,7 @@ def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
                                 "status": "complete",
                                 "video_url": video_url,
                                 "error": None,
+                                "updated_at": time.time(),
                             })
                     return
 
@@ -676,18 +886,32 @@ def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
                 _video_jobs[job_id].update({
                     "status": "error",
                     "error": str(exc)[:400],
+                    "updated_at": time.time(),
                 })
 
 
 @app.post("/api/video/generate")
 def generate_video(payload: VideoGenerateRequest, user=Depends(current_user)):
     job_id = uuid.uuid4().hex
+    now = time.time()
     with _video_jobs_lock:
+        _prune_video_jobs(now)
+        active_jobs = [
+            job for job in _video_jobs.values()
+            if job.get("status") in {"queued", "running"}
+        ]
+        user_active_jobs = sum(1 for job in active_jobs if job.get("owner_id") == str(user["id"]))
+        if user_active_jobs >= _VIDEO_MAX_ACTIVE_PER_USER:
+            raise HTTPException(status_code=429, detail="لديك مهمة فيديو قيد التنفيذ. انتظر اكتمالها قبل إرسال مهمة أخرى.")
+        if len(active_jobs) >= _VIDEO_MAX_ACTIVE_GLOBAL:
+            raise HTTPException(status_code=503, detail="طابور توليد الفيديو مشغول حالياً. حاول بعد قليل.")
         _video_jobs[job_id] = {
             "owner_id": str(user["id"]),
             "status": "queued",
             "video_url": None,
             "error": None,
+            "created_at": now,
+            "updated_at": now,
         }
     worker = threading.Thread(
         target=_run_ltx_video_job,
@@ -704,6 +928,7 @@ def video_status(project_id: str, user=Depends(current_user)):
     if not re.fullmatch(r"[A-Fa-f0-9]{32}", project_id):
         raise HTTPException(status_code=422, detail="رقم المهمة غير صالح.")
     with _video_jobs_lock:
+        _prune_video_jobs()
         job = _video_jobs.get(project_id)
         if not job or job["owner_id"] != str(user["id"]):
             raise HTTPException(status_code=404, detail="المهمة غير موجودة أو لا تملك صلاحية الوصول إليها.")

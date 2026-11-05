@@ -4,26 +4,41 @@ A responsive Arabic/English toolbox website built with HTML, CSS and vanilla Jav
 
 ## Image generation providers
 
-The image generator supports three server-side providers:
+The image generator supports four server-side providers:
 
-- **OVHcloud AI Endpoints (default):** Stable Diffusion XL. Anonymous requests are supported with a limit of 2 requests per minute per model and source IP. An optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` raises the documented limit; OVHcloud account keys require a Public Cloud project with a payment method.
-- **Pollinations:** FLUX.1 schnell. Requires the secret `POLLINATIONS_API_KEY` from https://enter.pollinations.ai. Keep this key on the backend only.
+- **Google Gemini (default):** Gemini image generation model. Requires `GEMINI_API_KEY` or `GOOGLE_API_KEY`.
+- **OVHcloud AI Endpoints:** Stable Diffusion XL. Anonymous inference is rate-limited; an optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` may raise the limit.
+- **Pollinations:** FLUX.1 schnell. Requires the secret `POLLINATIONS_API_KEY` from https://enter.pollinations.ai.
 - **Cloudflare Workers AI:** FLUX.1 schnell. Requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
-Set optional credentials in Render → Environment. The user selects the provider in the image generator. OVHcloud's anonymous rate limit is shared by requests from the same server IP, so it is suitable for limited testing, not unlimited production use.
+Configure only the providers you intend to use in Render → Environment. Keep every private key on the backend. Provider quotas, prices and regional availability vary; no provider is represented as unlimited.
 
-## Included browser tools
-1. Word counter
-2. Case converter
-3. JSON formatter and validator
-4. Prompt generator
-5. Quick notes (saved in browser localStorage)
-6. Base64 encoder / decoder
-7. URL encoder / decoder
-8. Text cleaner
-9. Secure random password generator (uses the browser Web Crypto API)
+## Included SmartHub tools
 
-All tools run locally in the browser. User-entered text is not sent to a server.
+The Tools directory currently lists **24 tools and utilities**:
+
+- **Images:** resize, crop, rotate, flip, watermark, compression, brightness/contrast/sharpening, AI image generation, AI image editing, image upscaling (external browser tool), image-to-3D guidance (local Modly workflow), image-to-QR, and temporary image sharing.
+- **Video:** trim, sequential merge, split, compression, MP4 conversion, audio extraction, mute, rotation, speed, reverse, color correction, crop, GIF, audio fade and volume adjustment.
+- **Audio and documents:** audio trim/merge and WAV export; PDF merge and image-to-PDF.
+- **Scanning and utilities:** QR/barcode scan and generation, word counter, case conversion, JSON formatter, prompt generator, local notes, Base64, URL encoding, text cleanup and password generation.
+- **AI:** experimental Arabic/English text detector and text-to-video generation through a public LTX-Video Space.
+
+Local browser tools process files on the device. Account-backed tools and AI endpoints send the required input to the SmartHub API or the selected external provider. Review each tool's notice before uploading private material. AI detection is probabilistic; public model demos and external tools are not guaranteed to be available.
+
+## Tool readiness and provider configuration
+
+The interface and tool workflows are implemented. Before using provider-backed features, configure only the credentials for the providers you choose in Render → Environment. Never put secret keys in config.js, HTML, or browser JavaScript.
+
+| Feature | Required server configuration |
+|---|---|
+| AI assistant | GROQ_API_KEY (Gemini/Hugging Face are optional fallbacks where configured) |
+| AI image generation/editing | GEMINI_API_KEY or GOOGLE_API_KEY; optional OVHcloud, Pollinations and Cloudflare credentials |
+| AI text detector | HF_TOKEN and accessible Arabic/English inference models |
+| AI video | Public Hugging Face LTX Space; optional HF_TOKEN |
+| Accounts, support and image links | DATABASE_URL, JWT_SECRET, ADMIN_EMAILS |
+| Google sign-in | GOOGLE_CLIENT_ID plus the matching authorized browser origin |
+
+The video job queue is process-local and bounded: at most one active job per user and four active jobs per API process; completed/failed job records expire after six hours. This is a testing-oriented queue, not durable multi-instance job infrastructure.
 
 ## Deploy with GitHub Pages
 1. Open repository **Settings** → **Pages**.
@@ -31,8 +46,8 @@ All tools run locally in the browser. User-entered text is not sent to a server.
 3. Select **main** and **/(root)**, then click **Save**.
 4. Wait for deployment; GitHub will display the published URL in Pages settings.
 
-## Future AI integrations
-GitHub Pages is static hosting. Never put private API keys in browser files. Add AI providers through a backend or serverless function and store credentials in server-side environment variables.
+## Frontend deployment and secrets
+GitHub Pages serves the static frontend. All private provider credentials belong in the Render API environment and must never be committed to browser files. The frontend calls the backend through `config.js`; update `window.SMART_HUB_API_URL` only to the actual deployed API origin.
 
  
 ## Groq AI backend on Render
@@ -53,7 +68,7 @@ The API connects to a Render PostgreSQL database using the server-side DATABASE_
 
 On startup, the API creates the initial profiles, support_tickets, and support_replies tables and their indexes if they do not already exist. The /health response reports whether PostgreSQL is reachable.
 
-This schema is groundwork only: authentication, authorization, and protected support-ticket endpoints must be implemented before exposing the tables to users. Admin roles must only be assigned through a trusted server-side process.
+The API initializes these tables and exposes authenticated account, support-ticket, reply and image-sharing routes. Admin-only ticket operations are protected by the server-side role check. Admin roles must only be assigned through a trusted server-side database operation for an allowlisted email.
 
 
 ## Accounts and support center
@@ -65,12 +80,11 @@ Passwords are stored as salted scrypt hashes; plaintext passwords are never stor
 ### Required Render environment variables
 - `DATABASE_URL`: the Render PostgreSQL **Internal Database URL**.
 - `JWT_SECRET`: a random secret of at least 32 characters. Generate one securely and add it only in Render.
-- `ADMIN_EMAILS`: comma-separated email addresses allowed to request admin activation.
-- `ADMIN_SETUP_KEY`: a separate secret used once during administrator registration. Admin access requires both an allowlisted email and this key.
+- `ADMIN_EMAILS`: comma-separated allowlisted administrator email addresses.
 
-After setting these variables, redeploy the Render API. Create the administrator account using an address listed in `ADMIN_EMAILS` and enter `ADMIN_SETUP_KEY` in the admin setup field. Other registrations receive the regular user role. Do not share the setup key.
+After setting these variables, redeploy the Render API. Public registration cannot assign administrator privileges. Create the first administrator through a trusted, authenticated database operation that sets the role for an allowlisted account. Never expose database credentials or an admin setup secret in the browser.
 
-This first release does not yet include email verification, password reset, or automated abuse/rate limiting. Do not treat it as a fully hardened production identity system until those controls are added. The browser keeps the bearer token in session storage for the current tab.
+Email verification and password reset are not implemented. API rate limits are process-local and do not replace a shared edge/WAF limit in a multi-instance production deployment. The browser keeps the bearer token in session storage for the current tab.
 
 ## Free LTX-Video text-to-video integration
 

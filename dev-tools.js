@@ -1,0 +1,24 @@
+"use strict";
+const $=id=>document.getElementById(id);
+const show=(id,value)=>$(id).textContent=value;
+document.querySelectorAll("[data-open]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll("[data-open]").forEach(b=>b.classList.toggle("active",b===btn));document.querySelectorAll(".dev-tool").forEach(p=>p.classList.toggle("active",p.id===btn.dataset.open));}));
+$("jsonFormat").onclick=()=>{try{show("jsonOut",JSON.stringify(JSON.parse($("jsonIn").value),null,2));}catch(e){show("jsonOut","JSON غير صالح: "+e.message);}};
+$("jsonMin").onclick=()=>{try{show("jsonOut",JSON.stringify(JSON.parse($("jsonIn").value)));}catch(e){show("jsonOut","JSON غير صالح: "+e.message);}};
+$("b64Enc").onclick=()=>{try{show("b64Out",btoa(unescape(encodeURIComponent($("b64In").value))));}catch(e){show("b64Out","تعذر الترميز: "+e.message);}};
+$("b64Dec").onclick=()=>{try{show("b64Out",decodeURIComponent(escape(atob($("b64In").value.trim()))));}catch(e){show("b64Out","Base64 غير صالح أو ليس UTF-8.");}};
+$("urlEnc").onclick=()=>show("urlOut",encodeURIComponent($("urlIn").value));
+$("urlDec").onclick=()=>{try{show("urlOut",decodeURIComponent($("urlIn").value));}catch(e){show("urlOut","ترميز URL غير صالح.");}};
+$("hashGo").onclick=async()=>{try{const data=new TextEncoder().encode($("hashIn").value);const digest=await crypto.subtle.digest("SHA-256",data);show("hashOut",Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,"0")).join(""));}catch(e){show("hashOut","تعذر الحساب. افتح الموقع عبر HTTPS.");}};
+$("uuidGo").onclick=()=>show("uuidOut",crypto.randomUUID?crypto.randomUUID():"UUID غير مدعوم في هذا المتصفح.");
+$("jwtGo").onclick=()=>{try{const parts=$("jwtIn").value.trim().split(".");if(parts.length!==3)throw Error("JWT يجب أن يتكون من ثلاثة أجزاء.");const decode=s=>JSON.parse(decodeURIComponent(Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/").padEnd(Math.ceil(s.length/4)*4,"="))).map(c=>"%"+c.charCodeAt(0).toString(16).padStart(2,"0")).join("")));show("jwtOut","Header:\n"+JSON.stringify(decode(parts[0]),null,2)+"\n\nPayload:\n"+JSON.stringify(decode(parts[1]),null,2));}catch(e){show("jwtOut","تعذر فك الرمز: "+e.message);}};
+$("rxGo").onclick=()=>{try{const re=new RegExp($("rxPattern").value,$("rxFlags").value);const text=$("rxText").value;const matches=Array.from(text.matchAll(new RegExp(re.source,re.flags.includes("g")?re.flags:re.flags+"g")));show("rxOut",matches.length?matches.map(m=>"["+m.index+"] "+m[0]).join("\n"):"لا توجد مطابقات.");}catch(e){show("rxOut","Regex غير صالح: "+e.message);}};
+$("timeGo").onclick=()=>{const raw=$("timeIn").value.trim(),n=Number(raw);if(!raw||!Number.isFinite(n)){show("timeOut","أدخل رقماً صالحاً.");return;}const d=new Date(Math.abs(n)<1e12?n*1000:n);show("timeOut",Number.isNaN(d.getTime())?"Timestamp خارج النطاق.":d.toISOString()+"\nالتوقيت المحلي: "+d.toLocaleString());};
+$("timeNow").onclick=()=>{$("timeIn").value=Math.floor(Date.now()/1000);$("timeGo").click();};
+
+const textCount=()=>{const t=$("textCountIn").value,words=t.trim()?t.trim().split(/\s+/u).length:0,chars=Array.from(t).length,charsNoSpace=Array.from(t.replace(/\s/gu,"")).length,lines=t? t.split(/\r?\n/).length:0;show("textCountOut","الكلمات: "+words+"\nالأحرف: "+chars+"\nالأحرف دون مسافات: "+charsNoSpace+"\nالأسطر: "+lines);};
+$("textCountIn").addEventListener("input",textCount);
+$("caseUpper").onclick=()=>show("caseOut",$("caseIn").value.toLocaleUpperCase());
+$("caseLower").onclick=()=>show("caseOut",$("caseIn").value.toLocaleLowerCase());
+$("caseTitle").onclick=()=>show("caseOut",$("caseIn").value.toLocaleLowerCase().replace(/(^|[\\s-])([\\p{L}\\p{N}])/gu,(_,a,b)=>a+b.toLocaleUpperCase()));
+$("caseSentence").onclick=()=>{const t=$("caseIn").value.toLocaleLowerCase();show("caseOut",t.replace(/(^|[.!?؟。]\\s+)([\\p{L}])/gu,(_,a,b)=>a+b.toLocaleUpperCase()));};
+$("diffGo").onclick=()=>{const a=$("diffA").value.split(/\\r?\\n/),b=$("diffB").value.split(/\\r?\\n/),n=a.length,m=b.length;if(n*m>40000){show("diffOut","النص كبير جداً للمقارنة بهذه الطريقة.");return;}const dp=Array.from({length:n+1},()=>new Uint32Array(m+1));for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i][j]=a[i]===b[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);let i=0,j=0,out=[];while(i<n||j<m){if(i<n&&j<m&&a[i]===b[j]){out.push("  "+a[i]);i++;j++;}else if(j<m&&(i===n||dp[i][j+1]>=dp[i+1][j])){out.push("+ "+b[j++]);}else out.push("- "+a[i++]);}show("diffOut",out.join("\\n"));};

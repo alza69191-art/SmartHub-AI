@@ -36,6 +36,17 @@ def initialize_database():
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )''',
+        '''CREATE TABLE IF NOT EXISTS image_assets (
+            id UUID PRIMARY KEY,
+            user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+            file_name VARCHAR(160) NOT NULL,
+            content_type VARCHAR(40) NOT NULL CHECK (content_type IN ('image/png','image/jpeg','image/webp')),
+            data BYTEA NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMPTZ NOT NULL
+        )''',
+        'CREATE INDEX IF NOT EXISTS idx_image_assets_user_id ON image_assets(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_image_assets_expires_at ON image_assets(expires_at)',
         '''CREATE TABLE IF NOT EXISTS support_replies (
             id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             ticket_id BIGINT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="قص مقاطع الفيديو محلياً في المتصفح دون رفع الملفات إلى الخادم."><title>قص الفيديو مجاناً | SmartHub AI</title><link rel="stylesheet" href="styles.css"></head>
+<body>
+<header class="site-header"><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><nav class="top-nav"><a class="top-link" href="index.html">الرئيسية</a><a class="top-link active" href="tools.html">الأدوات</a><a class="top-link" href="account.html">الحساب</a></nav></header>
+<main class="standalone-page"><section>
+<div class="heading"><div><small>FREE BROWSER VIDEO TOOL</small><h1>قص الفيديو مجاناً</h1><p>حدد بداية ونهاية المقطع، ثم صدّره من متصفحك. تتم المعالجة محلياً ولا يتم رفع الفيديو إلى SmartHub AI.</p></div></div>
+<div class="support-card"><label class="label" for="videoFile">اختر ملف فيديو</label><input id="videoFile" class="search" type="file" accept="video/*"><p id="fileInfo" class="hint" aria-live="polite">لم يتم اختيار فيديو.</p><video id="sourceVideo" controls playsinline style="display:none;width:100%;max-height:440px;margin-top:14px;background:#000;border-radius:12px"></video></div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:16px">
+<article><h2>تحديد المقطع</h2><label class="label" for="startTime">وقت البداية (بالثواني)</label><input id="startTime" class="search" type="number" min="0" step=".1" value="0"><label class="label" for="endTime">وقت النهاية (بالثواني)</label><input id="endTime" class="search" type="number" min=".1" step=".1"><div class="actions"><button id="export" class="action" disabled>قص وتصدير المقطع</button><button id="download" class="action alt" disabled>تنزيل الفيديو</button></div><p id="status" class="hint" aria-live="polite">اختر فيديو لتفعيل القص.</p></article>
+<article><h2>ملاحظات التصدير</h2><p>يعتمد التصدير على MediaRecorder وترميز الفيديو الذي يدعمه المتصفح. قد يعاد ترميز المقطع أثناء التسجيل، وقد لا تعمل بعض الصيغ أو الملفات الكبيرة على بعض الأجهزة.</p><p class="hint">هذه نسخة أولية للقص فقط؛ دمج المقاطع والمؤثرات والمسارات المتعددة غير متاحة بعد.</p></article>
+</div>
+</section></main>
+<footer><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><span>© 2026 SmartHub AI</span></footer><script src="video-tools.js"></script></body></html>
