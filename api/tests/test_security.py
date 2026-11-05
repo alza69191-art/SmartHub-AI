@@ -51,13 +51,22 @@ class SecurityMiddlewareTests(unittest.TestCase):
         self.assertEqual(response.headers["Cross-Origin-Resource-Policy"], "same-site")
 
     def test_rejects_oversized_content_length(self):
-        request = make_request("/api/media", method="POST", headers={"content-length": str(16 * 1024 * 1024)})
+        request = make_request("/api/media", method="POST", headers={"content-length": str(19 * 1024 * 1024)})
         async def run():
             async def call_next(_request):
                 return Response("unexpected")
             return await self.middleware.dispatch(request, call_next)
         response = asyncio.run(run())
         self.assertEqual(response.status_code, 413)
+
+    def test_allows_base64_payload_for_maximum_image_edit(self):
+        request = make_request("/api/images/edit", method="POST", headers={"content-length": str(16 * 1024 * 1024)})
+        async def run():
+            async def call_next(_request):
+                return Response("ok")
+            return await self.middleware.dispatch(request, call_next)
+        response = asyncio.run(run())
+        self.assertEqual(response.status_code, 200)
 
     def test_rate_limits_expensive_provider_requests(self):
         async def run():
