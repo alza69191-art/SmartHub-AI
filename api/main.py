@@ -15,7 +15,6 @@ from psycopg.rows import dict_row
 from jose import jwt, JWTError
 from fastapi import Depends
 from starlette.concurrency import run_in_threadpool
-from gradio_client import Client
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
 from fastapi import FastAPI, HTTPException
@@ -138,6 +137,7 @@ def health():
             "groq": bool(os.getenv("GROQ_API_KEY")),
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "huggingface": bool(os.getenv("HF_TOKEN")),
+            "cloudflare_image": bool(os.getenv("CLOUDFLARE_ACCOUNT_ID") and os.getenv("CLOUDFLARE_API_TOKEN")),
             "ltx_video_public": True,
         },
     }
@@ -168,10 +168,7 @@ def chat(payload: ChatRequest):
     )
 
 
-# Qwen Image 2.1 generation through the official public Hugging Face Space.
-_qwen_client = None
-_qwen_lock = threading.Lock()
-
+# Image generation through Cloudflare Workers AI (FLUX.1 schnell).
 class ImageGenerateRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
     enhance_prompt: bool = True
@@ -182,77 +179,43 @@ class ImageGenerateRequest(BaseModel):
     negative_prompt: str = Field(default="", max_length=1500)
     seed: int = Field(default=0, ge=0, le=2147483647)
 
-def get_qwen_client():
-    global _qwen_client
-    if _qwen_client is None:
-        token = os.getenv("HF_TOKEN", "").strip() or None
-        _qwen_client = Client(
-            "Qwen/Qwen-Image-2.1",
-            hf_token=token,
-            httpx_kwargs={"timeout": 600},
-            verbose=False,
-        )
-    return _qwen_client
 
-def qwen_image_to_data_url(result):
-    # Gradio Image outputs are normally downloaded to a local filepath.
-    if isinstance(result, (tuple, list)) and result:
-        result = result[0]
-    if isinstance(result, dict):
-        result = result.get("path") or result.get("url")
-    if not isinstance(result, str):
-        raise RuntimeError("Qwen returned an unsupported image result")
-    if result.startswith("http://") or result.startswith("https://"):
-        image_response = requests.get(result, timeout=90)
-        image_response.raise_for_status()
-        raw = image_response.content
-    else:
-        with open(result, "rb") as image_file:
-            raw = image_file.read()
-    if not raw:
-        raise RuntimeError("Qwen returned an empty image")
-    return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+def generate_cloudflare_image(payload):
+    account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+    if not account_id or not api_token:
+        raise RuntimeError("Cloudflare Workers AI credentials are not configured")
 
-def generate_qwen_image(payload):
-    # The Space uses a two-stage flow: prepare_request creates request_state,
-    # then generate_request consumes that state to run the GPU generation.
-    with _qwen_lock:
-        client = get_qwen_client()
-        prepared = client.predict(
-            input_images=None,
-            original_prompt=payload.prompt,
-            enable_extend=payload.enhance_prompt,
-            custom_size=payload.custom_size,
-            quality=payload.quality,
-            seed=payload.seed,
-            randomize_seed=True,
-            api_name="/prepare_request",
-        )
-        # gradio_client excludes gr.State outputs and manages state internally
-        # for the same Client session. The visible prepare outputs are:
-        # placeholder image, seed, and rewritten prompt.
-        if not isinstance(prepared, (tuple, list)) or len(prepared) < 3:
-            raise RuntimeError(
-                f"Unexpected Qwen prepare response: {type(prepared).__name__}"
-            )
-        actual_seed = prepared[1]
-        image_result = client.predict(
-            original_prompt=payload.prompt,
-            enable_extend=payload.enhance_prompt,
-            custom_size=payload.custom_size,
-            log_dir="./generation_logs_paper_case",
-            seed=actual_seed,
-            height=payload.height,
-            width=payload.width,
-            negative_prompt=payload.negative_prompt or " ",
-            api_name="/generate_request",
-        )
-        return {
-            "image": qwen_image_to_data_url(image_result),
-            "seed": actual_seed,
-            "model": "Qwen Image 2.1",
-            "enhanced_prompt": prepared[2] or "",
-        }
+    prompt = payload.prompt.strip()
+    if len(prompt) > 2048:
+        raise ValueError("FLUX.1 schnell accepts prompts up to 2048 characters")
+
+    endpoint = (
+        "https://api.cloudflare.com/client/v4/accounts/"
+        + account_id
+        + "/ai/run/@cf/black-forest-labs/flux-1-schnell"
+    )
+    response = requests.post(
+        endpoint,
+        headers={
+            "Authorization": "Bearer " + api_token,
+            "Content-Type": "application/json",
+        },
+        json={"prompt": prompt, "steps": 4 if payload.quality == "speed" else 8},
+        timeout=180,
+    )
+    response.raise_for_status()
+    data = response.json()
+    result = data.get("result") or {}
+    image_base64 = result.get("image") if isinstance(result, dict) else None
+    if not image_base64:
+        raise RuntimeError("Cloudflare returned no generated image")
+
+    return {
+        "image": "data:image/jpeg;charset=utf-8;base64," + image_base64,
+        "model": "FLUX.1 schnell",
+        "provider": "Cloudflare Workers AI",
+    }
 
 
 # Authentication and support API
@@ -332,14 +295,16 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
 @app.post("/api/images/generate")
 async def generate_image(payload: ImageGenerateRequest, user=Depends(current_user)):
     try:
-        result = await run_in_threadpool(generate_qwen_image, payload)
-        logger.info("Qwen image generated for user %s", user["id"])
+        result = await run_in_threadpool(generate_cloudflare_image, payload)
+        logger.info("FLUX image generated for user %s", user["id"])
         return result
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
-        logger.exception("Qwen Image 2.1 generation failed")
+        logger.exception("Cloudflare FLUX image generation failed")
         raise HTTPException(
             status_code=502,
-            detail="فشل اتصال Qwen: " + type(exc).__name__ + ". راجع سجلات Render لمعرفة السبب التفصيلي.",
+            detail="تعذر توليد الصورة عبر FLUX: " + type(exc).__name__ + ". تحقق من إعدادات Cloudflare وسجلات Render.",
         )
 
 def require_admin(user=Depends(current_user)):
