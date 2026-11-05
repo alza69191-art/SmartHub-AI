@@ -41,6 +41,9 @@ jobs:
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The legacy SDK 'tools' package is no longer published.
+          packages: 'platform-tools'
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
