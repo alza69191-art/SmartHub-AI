@@ -64,13 +64,14 @@ jobs:
 
       - name: Build release APK and AAB
         working-directory: android
-        run: gradle --no-daemon assembleRelease bundleRelease
+        run: gradle --no-daemon assembleDebug assembleRelease bundleRelease
 
-      - name: Upload unsigned Android artifacts
+      - name: Upload Android test APK and unsigned release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: smarthub-ai-android-unsigned
+          name: smarthub-ai-android-builds
           if-no-files-found: error
           path: |
+            android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/bundle/release/*.aab
