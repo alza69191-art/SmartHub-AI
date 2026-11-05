@@ -59,6 +59,20 @@ class SecurityMiddlewareTests(unittest.TestCase):
         response = asyncio.run(run())
         self.assertEqual(response.status_code, 413)
 
+    def test_rate_limits_expensive_provider_requests(self):
+        async def run():
+            async def call_next(_request):
+                return Response("ok")
+            responses = []
+            for _ in range(4):
+                responses.append(await self.middleware.dispatch(
+                    make_request("/api/images/generate", method="POST"), call_next
+                ))
+            return responses
+        responses = asyncio.run(run())
+        self.assertTrue(all(response.status_code == 200 for response in responses[:3]))
+        self.assertEqual(responses[3].status_code, 429)
+
     def test_rate_limits_auth_requests(self):
         async def run():
             async def call_next(_request):
