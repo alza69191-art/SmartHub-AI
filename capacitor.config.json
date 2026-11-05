@@ -1,7 +1,7 @@
 {
   "appId": "com.smarthubai.app",
   "appName": "SmartHub AI",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
     "androidScheme": "https"
   },
