@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 import psycopg
 from psycopg.rows import dict_row
-from jose import jwt, JWTError
+import jwt
 from fastapi import Depends
 from starlette.concurrency import run_in_threadpool
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
