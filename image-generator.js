@@ -6,7 +6,7 @@ $("generate").addEventListener("click",async()=>{
  if(!token){$("status").textContent="سجّل الدخول أولاً من صفحة الحساب.";return;}
  const prompt=$("prompt").value.trim();
  if(prompt.length<3){$("status").textContent="اكتب وصفاً للصورة أولاً.";return;}
- const button=$("generate");button.disabled=true;$("result").style.display="none";$("status").textContent="جارٍ الاتصال بالنموذج وتجهيز الصورة. قد يستغرق ذلك عدة دقائق...";
+ const button=$("generate");button.disabled=true;$("result").style.display="none";$("status").textContent="جارٍ الاتصال بـ Google Gemini وتجهيز الصورة. قد يستغرق ذلك بعض الوقت...";
  try{
   const response=await fetch(api+"/api/images/generate",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({prompt,provider:$("provider").value,quality:$("quality").value})});
   const data=await response.json().catch(()=>({}));
