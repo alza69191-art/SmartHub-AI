@@ -96,7 +96,7 @@ def ask_gemini(messages):
             })
     response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        params={"key": key},
+        headers={"x-goog-api-key": key},
         json={
             "systemInstruction": {"parts": [{"text": system_text}]},
             "contents": contents,
@@ -259,7 +259,7 @@ def call_gemini_image(parts):
         raise RuntimeError("GEMINI_API_KEY is not configured")
     response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent",
-        params={"key": key},
+        headers={"x-goog-api-key": key},
         json={
             "contents": [{"parts": parts}],
             "generationConfig": {"responseModalities": ["IMAGE"]},
