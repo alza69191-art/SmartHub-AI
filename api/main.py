@@ -140,6 +140,7 @@ def health():
             "cloudflare_image": bool(os.getenv("CLOUDFLARE_ACCOUNT_ID") and os.getenv("CLOUDFLARE_API_TOKEN")),
             "ovh_image": True,
             "pollinations_image": bool(os.getenv("POLLINATIONS_API_KEY")),
+            "gemini_image": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "ltx_video_public": True,
         },
     }
@@ -173,13 +174,58 @@ def chat(payload: ChatRequest):
 # Image generation through OVHcloud SDXL, Pollinations FLUX, or Cloudflare FLUX.
 class ImageGenerateRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
-    provider: str = Field(default="ovh", pattern="^(ovh|pollinations|cloudflare)$")
+    provider: str = Field(default="gemini", pattern="^(gemini|ovh|pollinations|cloudflare)$")
     quality: str = Field(default="speed", pattern="^(speed|quality)$")
+
+
+class ImageEditRequest(BaseModel):
+    prompt: str = Field(min_length=3, max_length=4000)
+    image_base64: str = Field(min_length=100, max_length=16000000)
+    mime_type: str = Field(pattern="^(image/png|image/jpeg|image/webp)$")
 
 
 def image_data_uri(image_bytes, content_type="image/png"):
     encoded = base64.b64encode(image_bytes).decode("ascii")
     return "data:" + content_type + ";base64," + encoded
+
+
+def extract_gemini_image(data):
+    for candidate in data.get("candidates", []):
+        for part in candidate.get("content", {}).get("parts", []):
+            inline = part.get("inlineData") or part.get("inline_data") or {}
+            encoded = inline.get("data")
+            mime = inline.get("mimeType") or inline.get("mime_type") or "image/png"
+            if encoded:
+                return image_data_uri(base64.b64decode(encoded), mime)
+    raise RuntimeError("Google Gemini returned no image data")
+
+
+def call_gemini_image(parts):
+    key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+    response = requests.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent",
+        params={"key": key},
+        json={
+            "contents": [{"parts": parts}],
+            "generationConfig": {"responseModalities": ["IMAGE"]},
+        },
+        timeout=240,
+    )
+    if not response.ok:
+        logger.error("Gemini image API returned HTTP %s: %s", response.status_code, response.text[:1200])
+    response.raise_for_status()
+    return extract_gemini_image(response.json())
+
+
+def generate_gemini_image(payload):
+    image = call_gemini_image([{"text": payload.prompt.strip()}])
+    return {
+        "image": image,
+        "model": "Gemini 3.1 Flash Image (Nano Banana 2)",
+        "provider": "Google Gemini",
+    }
 
 
 def generate_ovh_image(payload):
@@ -274,6 +320,7 @@ def generate_cloudflare_image(payload):
 
 
 IMAGE_PROVIDERS = {
+    "gemini": generate_gemini_image,
     "ovh": generate_ovh_image,
     "pollinations": generate_pollinations_image,
     "cloudflare": generate_cloudflare_image,
@@ -353,6 +400,38 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     if not user:
         raise HTTPException(status_code=401, detail="الحساب غير موجود")
     return user
+
+@app.post("/api/images/edit")
+async def edit_image(payload: ImageEditRequest, user=Depends(current_user)):
+    try:
+        image_bytes = base64.b64decode(payload.image_base64, validate=True)
+        if len(image_bytes) > 12 * 1024 * 1024:
+            raise ValueError("حجم الصورة يتجاوز الحد المسموح (12 MB).")
+        result_image = await run_in_threadpool(
+            call_gemini_image,
+            [
+                {"text": payload.prompt.strip()},
+                {"inline_data": {
+                    "mime_type": payload.mime_type,
+                    "data": base64.b64encode(image_bytes).decode("ascii"),
+                }},
+            ],
+        )
+        logger.info("Google Gemini image edited for user %s", user["id"])
+        return {
+            "image": result_image,
+            "model": "Gemini 3.1 Flash Image (Nano Banana 2)",
+            "provider": "Google Gemini",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Gemini image editing failed")
+        raise HTTPException(
+            status_code=502,
+            detail="تعذر تعديل الصورة عبر Google Gemini: " + type(exc).__name__ + ". تحقق من المفتاح وحصة الاستخدام وسجلات Render.",
+        )
+
 
 @app.post("/api/images/generate")
 async def generate_image(payload: ImageGenerateRequest, user=Depends(current_user)):
