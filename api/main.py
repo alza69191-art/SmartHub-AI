@@ -3,6 +3,7 @@ import json
 import os
 import base64
 import threading
+import time
 import re
 import uuid
 import hashlib
@@ -752,6 +753,28 @@ def update_ticket_status(ticket_id: int,status: str,user=Depends(require_admin))
 LTX_SPACE_URL = "https://lightricks-ltx-video-distilled.hf.space"
 _video_jobs = {}
 _video_jobs_lock = threading.Lock()
+_VIDEO_JOB_TTL_SECONDS = 6 * 60 * 60
+_VIDEO_MAX_ACTIVE_GLOBAL = 4
+_VIDEO_MAX_ACTIVE_PER_USER = 1
+
+
+def _prune_video_jobs(now=None):
+    now = now or time.time()
+    expired = [
+        job_id for job_id, job in _video_jobs.items()
+        if job.get("status") in {"complete", "error"}
+        and now - job.get("updated_at", job.get("created_at", now)) > _VIDEO_JOB_TTL_SECONDS
+    ]
+    for job_id in expired:
+        _video_jobs.pop(job_id, None)
+    if len(_video_jobs) > 100:
+        terminal = sorted(
+            ((job.get("updated_at", job.get("created_at", now)), job_id)
+             for job_id, job in _video_jobs.items()
+             if job.get("status") in {"complete", "error"})
+        )
+        for _, job_id in terminal[:max(0, len(_video_jobs) - 80)]:
+            _video_jobs.pop(job_id, None)
 
 
 class VideoGenerateRequest(BaseModel):
@@ -819,7 +842,7 @@ def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
 
         with _video_jobs_lock:
             if job_id in _video_jobs:
-                _video_jobs[job_id]["status"] = "running"
+                _video_jobs[job_id].update({"status": "running", "updated_at": time.time()})
 
         with requests.get(
             LTX_SPACE_URL + "/gradio_api/call/text_to_video/" + event_id,
@@ -851,6 +874,7 @@ def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
                                 "status": "complete",
                                 "video_url": video_url,
                                 "error": None,
+                                "updated_at": time.time(),
                             })
                     return
 
@@ -862,18 +886,31 @@ def _run_ltx_video_job(job_id, prompt, duration, aspect_ratio, owner_id):
                 _video_jobs[job_id].update({
                     "status": "error",
                     "error": str(exc)[:400],
+                    "updated_at": time.time(),
                 })
 
 
 @app.post("/api/video/generate")
 def generate_video(payload: VideoGenerateRequest, user=Depends(current_user)):
     job_id = uuid.uuid4().hex
+    now = time.time()
     with _video_jobs_lock:
+        _prune_video_jobs(now)
+        active_jobs = [
+            job for job in _video_jobs.values()
+            if job.get("status") in {"queued", "running"}
+        ]
+        if any(job.get("owner_id") == str(user["id"]) for job in active_jobs):
+            raise HTTPException(status_code=429, detail="لديك مهمة فيديو قيد التنفيذ. انتظر اكتمالها قبل إرسال مهمة أخرى.")
+        if len(active_jobs) >= _VIDEO_MAX_ACTIVE_GLOBAL:
+            raise HTTPException(status_code=503, detail="طابور توليد الفيديو مشغول حالياً. حاول بعد قليل.")
         _video_jobs[job_id] = {
             "owner_id": str(user["id"]),
             "status": "queued",
             "video_url": None,
             "error": None,
+            "created_at": now,
+            "updated_at": now,
         }
     worker = threading.Thread(
         target=_run_ltx_video_job,
@@ -890,6 +927,7 @@ def video_status(project_id: str, user=Depends(current_user)):
     if not re.fullmatch(r"[A-Fa-f0-9]{32}", project_id):
         raise HTTPException(status_code=422, detail="رقم المهمة غير صالح.")
     with _video_jobs_lock:
+        _prune_video_jobs()
         job = _video_jobs.get(project_id)
         if not job or job["owner_id"] != str(user["id"]):
             raise HTTPException(status_code=404, detail="المهمة غير موجودة أو لا تملك صلاحية الوصول إليها.")
