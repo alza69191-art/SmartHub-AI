@@ -496,6 +496,8 @@ def upload_image_link(payload: ImageUploadRequest, request: Request, user=Depend
                     (asset_id, str(user["id"]), safe_name, payload.mime_type, psycopg.Binary(raw)),
                 )
                 expires_at = cur.fetchone()["expires_at"]
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Image share upload failed")
         raise HTTPException(status_code=503, detail="تعذر حفظ الصورة. تحقق من قاعدة البيانات.")
