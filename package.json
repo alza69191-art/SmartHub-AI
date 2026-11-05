@@ -4,9 +4,10 @@
   "private": true,
   "description": "Capacitor wrapper for SmartHub AI",
   "scripts": {
-    "android:sync": "cap sync android",
+    "android:sync": "npm run prepare:mobile && cap sync android",
     "android:open": "cap open android",
-    "android:run": "cap run android"
+    "android:run": "cap run android",
+    "prepare:mobile": "node scripts/prepare-capacitor.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
