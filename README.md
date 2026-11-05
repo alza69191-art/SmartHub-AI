@@ -94,12 +94,19 @@ API routes:
 The model is `Lightricks/LTX-Video` hosted in the public `Lightricks/ltx-video-distilled` Space. Public demo capacity is shared; it is suitable for testing, not guaranteed production availability. Generation may fail when the Space is paused or overloaded.
 
 
-## FLUX.1 schnell image generation via Cloudflare Workers AI
+## Image generation and editing
 
-The image generator now uses Cloudflare Workers AI instead of the public Qwen Gradio Space.
+SmartHub includes two separate Google Gemini image tools:
+- `image-generator.html`: text-to-image generation. Google Gemini (Nano Banana 2 / `gemini-3.1-flash-image`) is the default provider; OVHcloud, Pollinations, and Cloudflare remain optional alternatives.
+- `image-editor.html`: upload a PNG, JPEG, or WebP image and describe edits in natural language. The image and prompt are sent to the backend for Gemini image editing.
 
-Add these secrets to the Render API service environment:
-- CLOUDFLARE_ACCOUNT_ID: your Cloudflare account ID.
-- CLOUDFLARE_API_TOKEN: an API token with Workers AI Write permission.
+Configure `GEMINI_API_KEY` in the Render API service environment. The key is read only by FastAPI and is never exposed to browser JavaScript. Both image endpoints require an authenticated SmartHub user:
+- `POST /api/images/generate`
+- `POST /api/images/edit`
 
-The API calls @cf/black-forest-labs/flux-1-schnell server-side; credentials are never sent to the browser. The model accepts prompts up to 2,048 characters and supports 4- or 8-step generation. Cloudflare's free Workers AI allocation is 10,000 Neurons per day; it is a quota, not unlimited usage. See https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/ and https://developers.cloudflare.com/workers-ai/platform/pricing/.
+The editor accepts images up to 12 MB. Gemini API usage is subject to the model's current pricing, quotas, and regional availability; do not assume unlimited or free image generation. See the official [Gemini image generation and editing guide](https://ai.google.dev/gemini-api/docs/image-generation).
+
+Optional alternative providers:
+- OVHcloud: public anonymous inference has rate limits; an optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` can be configured.
+- Pollinations: requires `POLLINATIONS_API_KEY`.
+- Cloudflare Workers AI: requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; free Neurons are quota-limited, not unlimited.
