@@ -4,13 +4,14 @@ A responsive Arabic/English toolbox website built with HTML, CSS and vanilla Jav
 
 ## Image generation providers
 
-The image generator supports three server-side providers:
+The image generator supports four server-side providers:
 
-- **OVHcloud AI Endpoints (default):** Stable Diffusion XL. Anonymous requests are supported with a limit of 2 requests per minute per model and source IP. An optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` raises the documented limit; OVHcloud account keys require a Public Cloud project with a payment method.
-- **Pollinations:** FLUX.1 schnell. Requires the secret `POLLINATIONS_API_KEY` from https://enter.pollinations.ai. Keep this key on the backend only.
+- **Google Gemini (default):** Gemini image generation model. Requires `GEMINI_API_KEY` or `GOOGLE_API_KEY`.
+- **OVHcloud AI Endpoints:** Stable Diffusion XL. Anonymous inference is rate-limited; an optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` may raise the limit.
+- **Pollinations:** FLUX.1 schnell. Requires the secret `POLLINATIONS_API_KEY` from https://enter.pollinations.ai.
 - **Cloudflare Workers AI:** FLUX.1 schnell. Requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
-Set optional credentials in Render → Environment. The user selects the provider in the image generator. OVHcloud's anonymous rate limit is shared by requests from the same server IP, so it is suitable for limited testing, not unlimited production use.
+Configure only the providers you intend to use in Render → Environment. Keep every private key on the backend. Provider quotas, prices and regional availability vary; no provider is represented as unlimited.
 
 ## Included SmartHub tools
 
@@ -45,8 +46,8 @@ The video job queue is process-local and bounded: at most one active job per use
 3. Select **main** and **/(root)**, then click **Save**.
 4. Wait for deployment; GitHub will display the published URL in Pages settings.
 
-## Future AI integrations
-GitHub Pages is static hosting. Never put private API keys in browser files. Add AI providers through a backend or serverless function and store credentials in server-side environment variables.
+## Frontend deployment and secrets
+GitHub Pages serves the static frontend. All private provider credentials belong in the Render API environment and must never be committed to browser files. The frontend calls the backend through `config.js`; update `window.SMART_HUB_API_URL` only to the actual deployed API origin.
 
  
 ## Groq AI backend on Render
@@ -67,7 +68,7 @@ The API connects to a Render PostgreSQL database using the server-side DATABASE_
 
 On startup, the API creates the initial profiles, support_tickets, and support_replies tables and their indexes if they do not already exist. The /health response reports whether PostgreSQL is reachable.
 
-This schema is groundwork only: authentication, authorization, and protected support-ticket endpoints must be implemented before exposing the tables to users. Admin roles must only be assigned through a trusted server-side process.
+The API initializes these tables and exposes authenticated account, support-ticket, reply and image-sharing routes. Admin-only ticket operations are protected by the server-side role check. Admin roles must only be assigned through a trusted server-side database operation for an allowlisted email.
 
 
 ## Accounts and support center
