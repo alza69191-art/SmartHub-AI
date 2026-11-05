@@ -16,7 +16,7 @@
 
 ## Image sharing
 - Image sharing requires authentication and PostgreSQL.
-- Only PNG, JPEG, and WebP files up to 5 MB are accepted; the server checks file signatures.
+- Only PNG, JPEG, and WebP files up to 5 MB are accepted; the server checks file signatures. Each account is limited to 10 active share links and 25 MB of active shared image data.
 - Share URLs are public bearer links for anyone who has the URL and expire after 30 days. Users should not upload sensitive images.
 - Expired records are excluded from retrieval and are purged during subsequent uploads. Configure a database retention job if strict physical deletion timing is required.
 
