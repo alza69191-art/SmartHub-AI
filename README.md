@@ -2,6 +2,16 @@
 
 A responsive Arabic/English toolbox website built with HTML, CSS and vanilla JavaScript.
 
+## Image generation providers
+
+The image generator supports three server-side providers:
+
+- **OVHcloud AI Endpoints (default):** Stable Diffusion XL. Anonymous requests are supported with a limit of 2 requests per minute per model and source IP. An optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` raises the documented limit; OVHcloud account keys require a Public Cloud project with a payment method.
+- **Pollinations:** FLUX.1 schnell. Requires the secret `POLLINATIONS_API_KEY` from https://enter.pollinations.ai. Keep this key on the backend only.
+- **Cloudflare Workers AI:** FLUX.1 schnell. Requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+
+Set optional credentials in Render → Environment. The user selects the provider in the image generator. OVHcloud's anonymous rate limit is shared by requests from the same server IP, so it is suitable for limited testing, not unlimited production use.
+
 ## Included browser tools
 1. Word counter
 2. Case converter
