@@ -25,7 +25,7 @@ class RequestSecurityMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin" if request.method == "GET" and request.url.path.startswith("/api/media/") else "same-site"
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         if request.url.scheme == "https":
