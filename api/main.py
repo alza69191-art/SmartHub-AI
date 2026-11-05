@@ -31,12 +31,12 @@ logger = logging.getLogger("smarthub")
 app = FastAPI(title="SmartHub AI API", version="1.2.0")
 install_security(app)
 
-frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "https://alza69191-art.github.io")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in frontend_origin.split(",")],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
