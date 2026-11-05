@@ -82,3 +82,14 @@ API routes:
 - `GET /api/video/status/{project_id}` — checks the job and returns the output URL.
 
 The model is `Lightricks/LTX-Video` hosted in the public `Lightricks/ltx-video-distilled` Space. Public demo capacity is shared; it is suitable for testing, not guaranteed production availability. Generation may fail when the Space is paused or overloaded.
+
+
+## FLUX.1 schnell image generation via Cloudflare Workers AI
+
+The image generator now uses Cloudflare Workers AI instead of the public Qwen Gradio Space.
+
+Add these secrets to the Render API service environment:
+- CLOUDFLARE_ACCOUNT_ID: your Cloudflare account ID.
+- CLOUDFLARE_API_TOKEN: an API token with Workers AI Write permission.
+
+The API calls @cf/black-forest-labs/flux-1-schnell server-side; credentials are never sent to the browser. The model accepts prompts up to 2,048 characters and supports 4- or 8-step generation. Cloudflare's free Workers AI allocation is 10,000 Neurons per day; it is a quota, not unlimited usage. See https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/ and https://developers.cloudflare.com/workers-ai/platform/pricing/.
