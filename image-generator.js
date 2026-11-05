@@ -8,11 +8,11 @@ $("generate").addEventListener("click",async()=>{
  if(prompt.length<3){$("status").textContent="اكتب وصفاً للصورة أولاً.";return;}
  const button=$("generate");button.disabled=true;$("result").style.display="none";$("status").textContent="جارٍ الاتصال بالنموذج وتجهيز الصورة. قد يستغرق ذلك عدة دقائق...";
  try{
-  const response=await fetch(api+"/api/images/generate",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({prompt,quality:$("quality").value})});
+  const response=await fetch(api+"/api/images/generate",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({prompt,provider:$("provider").value,quality:$("quality").value})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data.detail||"فشل توليد الصورة");
   $("output").src=data.image;$("download").href=data.image;$("result").style.display="block";
-  $("status").textContent="تم إنشاء الصورة بنجاح باستخدام "+(data.model||"FLUX.1 schnell")+".";
+  $("status").textContent="تم إنشاء الصورة بنجاح باستخدام "+((data.model||"النموذج") + " عبر " + (data.provider||"المزود"))+".";
  }catch(error){$("status").textContent=error.message||"حدث خطأ أثناء التوليد."}
  finally{button.disabled=false}
 });
