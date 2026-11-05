@@ -17,7 +17,8 @@ from fastapi import Depends
 from starlette.concurrency import run_in_threadpool
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
-from fastapi import FastAPI, HTTPException\nfrom fastapi.responses import Response\nfrom fastapi import Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from groq import Groq
@@ -49,6 +50,10 @@ def startup():
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     history: list[dict] = Field(default_factory=list)
+
+class AITextDetectRequest(BaseModel):
+    text: str = Field(min_length=100, max_length=12000)
+    language: str = Field(default="auto", pattern="^(auto|ar|en)$")
 
 def build_messages(payload):
     messages = [{
@@ -157,7 +162,7 @@ def detect_ai_text(payload: AITextDetectRequest):
         raise HTTPException(status_code=503, detail="كاشف النص يحتاج HF_TOKEN على الخادم. لم يتم إرسال النص إلى أي مزود.")
     language = payload.language
     if language == "auto":
-        arabic_chars = sum("\\u0600" <= ch <= "\\u06ff" for ch in text_value)
+        arabic_chars = sum("\u0600" <= ch <= "\u06ff" for ch in text_value)
         language = "ar" if arabic_chars / max(1, len(text_value)) > 0.12 else "en"
     model = os.getenv("AI_DETECTOR_MODEL_AR" if language == "ar" else "AI_DETECTOR_MODEL_EN", "").strip()
     if not model:
@@ -393,7 +398,12 @@ class LoginRequest(BaseModel):
 class GoogleLoginRequest(BaseModel):
     credential: str = Field(min_length=20, max_length=10000)
 
-class AITextDetectRequest(BaseModel):\n    text: str = Field(min_length=100, max_length=12000)\n    language: str = Field(default="auto", pattern="^(auto|ar|en)$")\n\nclass ImageUploadRequest(BaseModel):\n    file_name: str = Field(min_length=1, max_length=160)\n    mime_type: str = Field(pattern="^(image/png|image/jpeg|image/webp)$")\n    image_base64: str = Field(min_length=100, max_length=7000000)\n\nclass TicketRequest(BaseModel):
+class ImageUploadRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=160)
+    mime_type: str = Field(pattern="^(image/png|image/jpeg|image/webp)$")
+    image_base64: str = Field(min_length=100, max_length=7000000)
+
+class TicketRequest(BaseModel):
     subject: str = Field(min_length=3, max_length=200)
     message: str = Field(min_length=10, max_length=5000)
 
@@ -462,8 +472,8 @@ def upload_image_link(payload: ImageUploadRequest, request: Request, user=Depend
     if len(raw) > 5 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="الحد الأقصى للصورة 5 ميغابايت.")
     signatures = {
-        "image/png": raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"),
-        "image/jpeg": raw.startswith(b"\\xff\\xd8\\xff"),
+        "image/png": raw.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg": raw.startswith(b"\xff\xd8\xff"),
         "image/webp": len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP",
     }
     if not signatures.get(payload.mime_type, False):
