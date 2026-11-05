@@ -193,11 +193,6 @@ def detect_ai_text(payload: AITextDetectRequest):
         raise HTTPException(status_code=502, detail="أعاد مزود الكشف استجابة غير متوقعة.")
 
 
-@app.post("/api/media")
-def upload_image_link(payload: ImageUploadRequest, user=Depends(lambda: None)):
-    raise HTTPException(status_code=501, detail="يجب تهيئة مصادقة الوسائط قبل الاستخدام.")
-
-
 @app.post("/api/chat")
 def chat(payload: ChatRequest):
     messages = build_messages(payload)
@@ -456,6 +451,76 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     if not user:
         raise HTTPException(status_code=401, detail="الحساب غير موجود")
     return user
+
+
+@app.post("/api/media")
+def upload_image_link(payload: ImageUploadRequest, request, user=Depends(current_user)):
+    try:
+        raw = base64.b64decode(payload.image_base64, validate=True)
+    except Exception:
+        raise HTTPException(status_code=422, detail="بيانات الصورة غير صالحة.")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="الحد الأقصى للصورة 5 ميغابايت.")
+    signatures = {
+        "image/png": raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"),
+        "image/jpeg": raw.startswith(b"\\xff\\xd8\\xff"),
+        "image/webp": len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP",
+    }
+    if not signatures.get(payload.mime_type, False):
+        raise HTTPException(status_code=415, detail="امتداد الصورة لا يطابق محتواها الفعلي.")
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", payload.file_name)[:120] or "image"
+    asset_id = str(uuid.uuid4())
+    try:
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM image_assets WHERE expires_at < NOW()")
+                cur.execute(
+                    """INSERT INTO image_assets (id,user_id,file_name,content_type,data,expires_at)
+                       VALUES (%s,%s,%s,%s,%s,NOW()+INTERVAL '30 days') RETURNING expires_at""",
+                    (asset_id, str(user["id"]), safe_name, payload.mime_type, psycopg.Binary(raw)),
+                )
+                expires_at = cur.fetchone()["expires_at"]
+    except Exception:
+        logger.exception("Image share upload failed")
+        raise HTTPException(status_code=503, detail="تعذر حفظ الصورة. تحقق من قاعدة البيانات.")
+    return {"url": str(request.base_url).rstrip("/") + "/api/media/" + asset_id,
+            "expires_at": expires_at.isoformat(), "retention_days": 30,
+            "notice": "الرابط عام لمن يمتلكه وينتهي بعد 30 يوماً."}
+
+
+@app.get("/api/media/{asset_id}")
+def get_shared_image(asset_id: str):
+    try:
+        asset_uuid = str(uuid.UUID(asset_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="الصورة غير موجودة.")
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT file_name,content_type,data FROM image_assets WHERE id=%s AND expires_at>NOW()", (asset_uuid,))
+            asset = cur.fetchone()
+    if not asset:
+        raise HTTPException(status_code=404, detail="الرابط غير موجود أو انتهت صلاحيته.")
+    return Response(content=bytes(asset["data"]), media_type=asset["content_type"],
+                    headers={"Content-Disposition": "inline; filename=shared-image",
+                             "Cache-Control": "public, max-age=3600",
+                             "X-Content-Type-Options": "nosniff"})
+
+
+@app.delete("/api/media/{asset_id}")
+def delete_shared_image(asset_id: str, user=Depends(current_user)):
+    try:
+        asset_uuid = str(uuid.UUID(asset_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="الصورة غير موجودة.")
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM image_assets WHERE id=%s AND user_id=%s RETURNING id",
+                        (asset_uuid, str(user["id"])))
+            deleted = cur.fetchone()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="الصورة غير موجودة أو لا تملك صلاحية حذفها.")
+    return {"deleted": True}
+
 
 @app.post("/api/images/edit")
 async def edit_image(payload: ImageEditRequest, user=Depends(current_user)):
