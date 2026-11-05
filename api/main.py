@@ -521,6 +521,11 @@ def google_login(payload: GoogleLoginRequest):
                 profile = cur.fetchone()
     except psycopg.errors.UniqueViolation:
         raise HTTPException(status_code=409, detail="هذا الحساب مرتبط مسبقاً بحساب آخر")
+    if profile["role"] == "admin" and not admin_email(email):
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE profiles SET role='user' WHERE id=%s RETURNING id,email,display_name,role,created_at", (str(profile["id"]),))
+                profile = cur.fetchone()
     return {"token": make_token(profile), "user": profile}
 
 
