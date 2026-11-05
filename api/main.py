@@ -591,7 +591,9 @@ async def generate_image(payload: ImageGenerateRequest, user=Depends(current_use
         )
 
 def require_admin(user=Depends(current_user)):
-    if user["role"] != "admin":
+    # Enforce the current server-side allowlist on every privileged request,
+    # not only at login time. Removing an email from ADMIN_EMAILS revokes access.
+    if user["role"] != "admin" or not admin_email(user.get("email") or ""):
         raise HTTPException(status_code=403, detail="هذه العملية للإدارة فقط")
     return user
 
