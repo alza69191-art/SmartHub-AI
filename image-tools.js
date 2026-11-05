@@ -1,38 +1,55 @@
 (() => {
- const $=id=>document.getElementById(id);
- const fileInput=$("imageFile"),canvas=$("preview"),ctx=canvas.getContext("2d",{willReadFrequently:true});
+ const $=id=>document.getElementById(id),fileInput=$("imageFile"),canvas=$("preview"),ctx=canvas.getContext("2d",{willReadFrequently:true});
  let source=null,sourceUrl=null,outputBlob=null;
  const say=(id,msg)=>$(id).textContent=msg;
- const bytes=n=>n<1024? n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(2)+" MB";
- function setOutput(id,suffix){$(id+"Value").textContent=suffix;}
- ["quality","brightness","contrast","sharpness"].forEach(id=>$(id).addEventListener("input",()=>{
-  const suffix=id==="sharpness"?"": "%";setOutput(id,$(id).value+suffix);
+ const bytes=n=>n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(2)+" MB";
+ const val=(id,fallback,min,max)=>Math.max(min,Math.min(max,Number($(id).value)||fallback));
+ ["quality","brightness","contrast","sharpness","watermarkOpacity"].forEach(id=>$(id).addEventListener("input",()=>{
+  const suffix=id==="sharpness"?"": "%";const out=$(id+"Value");if(out)out.textContent=$(id).value+suffix;
  }));
- $("keepRatio").addEventListener("change",()=>{if(source&&$("keepRatio").checked){$("width").value=source.naturalWidth;$("height").value=source.naturalHeight;}});
- $("width").addEventListener("input",()=>{if(source&&$("keepRatio").checked&&$("width").value){$("height").value=Math.round(Number($("width").value)*source.naturalHeight/source.naturalWidth)||1;}});
- $("height").addEventListener("input",()=>{if(source&&$("keepRatio").checked&&$("height").value){$("width").value=Math.round(Number($("height").value)*source.naturalWidth/source.naturalHeight)||1;}});
+ function cropRect(){
+  const sw=source.naturalWidth,sh=source.naturalHeight;
+  const x=val("cropX",0,0,99)/100,y=val("cropY",0,0,99)/100;
+  const w=Math.min(val("cropW",100,1,100)/100,1-x),h=Math.min(val("cropH",100,1,100)/100,1-y);
+  return {x:Math.floor(sw*x),y:Math.floor(sh*y),w:Math.max(1,Math.floor(sw*w)),h:Math.max(1,Math.floor(sh*h))};
+ }
+ function updateDimensions(){
+  if(!source)return;const r=cropRect();
+  $("width").value=r.w;$("height").value=r.h;
+ }
+ ["cropX","cropY","cropW","cropH"].forEach(id=>$(id).addEventListener("change",updateDimensions));
+ $("keepRatio").addEventListener("change",()=>{if(source&&$("keepRatio").checked)updateDimensions();});
+ $("width").addEventListener("input",()=>{if(source&&$("keepRatio").checked){const r=cropRect();$("height").value=Math.max(1,Math.round((Number($("width").value)||r.w)*r.h/r.w));}});
+ $("height").addEventListener("input",()=>{if(source&&$("keepRatio").checked){const r=cropRect();$("width").value=Math.max(1,Math.round((Number($("height").value)||r.h)*r.w/r.h));}});
  fileInput.addEventListener("change",()=>{
   const file=fileInput.files&&fileInput.files[0];if(!file)return;
   if(!file.type.startsWith("image/")){say("fileInfo","الملف المحدد ليس صورة.");return;}
   if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=URL.createObjectURL(file);source=new Image();
-  source.onload=()=>{$("width").value=source.naturalWidth;$("height").value=source.naturalHeight;$("process").disabled=false;$("download").disabled=true;outputBlob=null;say("fileInfo",file.name+" — "+source.naturalWidth+" × "+source.naturalHeight+" — "+bytes(file.size));render();};
-  source.onerror=()=>say("fileInfo","تعذر فتح الصورة.");
-  source.src=sourceUrl;
+  source.onload=()=>{["cropX","cropY"].forEach(id=>$(id).value=0);["cropW","cropH"].forEach(id=>$(id).value=100);updateDimensions();$("process").disabled=false;$("download").disabled=true;outputBlob=null;say("fileInfo",file.name+" — "+source.naturalWidth+" × "+source.naturalHeight+" — "+bytes(file.size));render();};
+  source.onerror=()=>say("fileInfo","تعذر فتح الصورة.");source.src=sourceUrl;
  });
  function render(){
   if(!source)return;
-  const w=Math.max(1,Math.min(12000,Number($("width").value)||source.naturalWidth));
-  const h=Math.max(1,Math.min(12000,Number($("height").value)||source.naturalHeight));
-  canvas.width=w;canvas.height=h;ctx.filter="brightness("+$("brightness").value+"%) contrast("+$("contrast").value+"%)";
-  ctx.drawImage(source,0,0,w,h);ctx.filter="none";
+  const r=cropRect(),w=val("width",r.w,1,12000),h=val("height",r.h,1,12000),rotation=Number($("rotation").value)||0;
+  const swap=rotation===90||rotation===270;canvas.width=swap?h:w;canvas.height=swap?w:h;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();ctx.filter="brightness("+val("brightness",100,50,150)+"%) contrast("+val("contrast",100,50,150)+"%)";
+  ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(rotation*Math.PI/180);
+  ctx.scale($("flipX").checked?-1:1,$("flipY").checked?-1:1);
+  ctx.drawImage(source,r.x,r.y,r.w,r.h,-w/2,-h/2,w,h);ctx.restore();ctx.filter="none";
   const amount=Number($("sharpness").value);
-  if(amount>0&&w*h<=16000000){
-   const image=ctx.getImageData(0,0,w,h),src=image.data,out=new Uint8ClampedArray(src),k=amount*.18;
-   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4,neighbors=[i-4,i+4,i-w*4,i+w*4];for(let c=0;c<3;c++){let v=src[i+c]* (1+4*k);for(const ni of neighbors)v-=src[ni+c]*k;out[i+c]=Math.max(0,Math.min(255,v));}}
+  if(amount>0&&canvas.width*canvas.height<=16000000){
+   const image=ctx.getImageData(0,0,canvas.width,canvas.height),src=image.data,out=new Uint8ClampedArray(src),k=amount*.18;
+   for(let y=1;y<canvas.height-1;y++)for(let x=1;x<canvas.width-1;x++){const i=(y*canvas.width+x)*4,neighbors=[i-4,i+4,i-canvas.width*4,i+canvas.width*4];for(let c=0;c<3;c++){let v=src[i+c]*(1+4*k);for(const ni of neighbors)v-=src[ni+c]*k;out[i+c]=Math.max(0,Math.min(255,v));}}
    image.data.set(out);ctx.putImageData(image,0,0);
   }else if(amount>0){say("resultInfo","تم تجاوز تطبيق الحدة لتجنب استهلاك ذاكرة كبير؛ خفّض الأبعاد.");}
+  const mark=$("watermark").value.trim();
+  if(mark){const size=Math.max(16,Math.round(canvas.width*.035));ctx.save();ctx.globalAlpha=val("watermarkOpacity",65,10,100)/100;ctx.fillStyle=$("watermarkColor").value;ctx.font="bold "+size+"px sans-serif";ctx.textAlign="right";ctx.textBaseline="bottom";ctx.shadowColor="#000";ctx.shadowBlur=Math.max(2,size*.12);ctx.fillText(mark,canvas.width-size*.6,canvas.height-size*.6,canvas.width-size*1.2);ctx.restore();}
   canvas.hidden=false;
  }
+ ["rotation","flipX","flipY","watermark","watermarkColor","cropX","cropY","cropW","cropH"].forEach(id=>$(id).addEventListener("change",()=>{if(source)render();}));
+ $("watermark").addEventListener("input",()=>{if(source)render();});
+ ["brightness","contrast","sharpness"].forEach(id=>$(id).addEventListener("input",()=>{if(source)render();}));
  $("process").addEventListener("click",()=>{
   if(!source)return;render();const type=$("format").value,q=Number($("quality").value)/100;
   canvas.toBlob(blob=>{if(!blob){say("resultInfo","تعذر تصدير الصورة بهذه الصيغة؛ جرّب PNG أو JPEG.");return;}outputBlob=blob;$("download").disabled=false;say("resultInfo","الحجم الناتج: "+bytes(blob.size)+" — الأبعاد: "+canvas.width+" × "+canvas.height+" — "+blob.type);},type,type==="image/png"?undefined:q);
