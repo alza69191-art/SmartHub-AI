@@ -21,7 +21,7 @@
    const rate=Math.max(...decoded.map(b=>b.sampleRate)),channels=Math.max(...decoded.map(b=>b.numberOfChannels)),total=decoded.reduce((n,b)=>n+b.duration,0);
    if(total>900)throw Error("المدة الإجمالية تتجاوز 15 دقيقة في هذا الإصدار.");
    const frames=Math.ceil(total*rate),out=ctx.createBuffer(channels,frames,rate);let offset=0;
-   for(const b of decoded){const tmp=ctx.createBuffer(channels,b.length,rate);for(let c=0;c<channels;c++){const src=b.getChannelData(Math.min(c,b.numberOfChannels-1));tmp.copyToChannel(src,c);}for(let c=0;c<channels;c++)out.getChannelData(c).set(tmp.getChannelData(c),offset);offset+=b.length;}
+   for(const b of decoded){const targetLength=Math.ceil(b.duration*rate);for(let c=0;c<channels;c++){const src=b.getChannelData(Math.min(c,b.numberOfChannels-1)),dst=out.getChannelData(c);for(let i=0;i<targetLength;i++){const pos=i*b.sampleRate/rate,lo=Math.floor(pos),hi=Math.min(src.length-1,lo+1),frac=pos-lo;dst[offset+i]=(src[lo]||0)*(1-frac)+(src[hi]||0)*frac;}}offset+=targetLength;}
    merged=out;$("start").value=0;$("end").value=merged.duration.toFixed(2);$("play").disabled=false;$("export").disabled=false;say("تم الدمج: "+total.toFixed(2)+" ثانية، "+channels+" قناة صوتية.");
   }catch(e){say(e.message||"تعذر معالجة الملفات.");}
   finally{$("join").disabled=false;}
