@@ -14,3 +14,11 @@ $("jwtGo").onclick=()=>{try{const parts=$("jwtIn").value.trim().split(".");if(pa
 $("rxGo").onclick=()=>{try{const re=new RegExp($("rxPattern").value,$("rxFlags").value);const text=$("rxText").value;const matches=Array.from(text.matchAll(new RegExp(re.source,re.flags.includes("g")?re.flags:re.flags+"g")));show("rxOut",matches.length?matches.map(m=>"["+m.index+"] "+m[0]).join("\n"):"لا توجد مطابقات.");}catch(e){show("rxOut","Regex غير صالح: "+e.message);}};
 $("timeGo").onclick=()=>{const raw=$("timeIn").value.trim(),n=Number(raw);if(!raw||!Number.isFinite(n)){show("timeOut","أدخل رقماً صالحاً.");return;}const d=new Date(Math.abs(n)<1e12?n*1000:n);show("timeOut",Number.isNaN(d.getTime())?"Timestamp خارج النطاق.":d.toISOString()+"\nالتوقيت المحلي: "+d.toLocaleString());};
 $("timeNow").onclick=()=>{$("timeIn").value=Math.floor(Date.now()/1000);$("timeGo").click();};
+
+const textCount=()=>{const t=$("textCountIn").value,words=t.trim()?t.trim().split(/\s+/u).length:0,chars=Array.from(t).length,charsNoSpace=Array.from(t.replace(/\s/gu,"")).length,lines=t? t.split(/\r?\n/).length:0;show("textCountOut","الكلمات: "+words+"\nالأحرف: "+chars+"\nالأحرف دون مسافات: "+charsNoSpace+"\nالأسطر: "+lines);};
+$("textCountIn").addEventListener("input",textCount);
+$("caseUpper").onclick=()=>show("caseOut",$("caseIn").value.toLocaleUpperCase());
+$("caseLower").onclick=()=>show("caseOut",$("caseIn").value.toLocaleLowerCase());
+$("caseTitle").onclick=()=>show("caseOut",$("caseIn").value.toLocaleLowerCase().replace(/(^|[\\s-])([\\p{L}\\p{N}])/gu,(_,a,b)=>a+b.toLocaleUpperCase()));
+$("caseSentence").onclick=()=>{const t=$("caseIn").value.toLocaleLowerCase();show("caseOut",t.replace(/(^|[.!?؟。]\\s+)([\\p{L}])/gu,(_,a,b)=>a+b.toLocaleUpperCase()));};
+$("diffGo").onclick=()=>{const a=$("diffA").value.split(/\\r?\\n/),b=$("diffB").value.split(/\\r?\\n/),n=a.length,m=b.length;if(n*m>40000){show("diffOut","النص كبير جداً للمقارنة بهذه الطريقة.");return;}const dp=Array.from({length:n+1},()=>new Uint32Array(m+1));for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i][j]=a[i]===b[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);let i=0,j=0,out=[];while(i<n||j<m){if(i<n&&j<m&&a[i]===b[j]){out.push("  "+a[i]);i++;j++;}else if(j<m&&(i===n||dp[i][j+1]>=dp[i+1][j])){out.push("+ "+b[j++]);}else out.push("- "+a[i++]);}show("diffOut",out.join("\\n"));};
