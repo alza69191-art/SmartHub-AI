@@ -20,6 +20,8 @@ Use Node.js 20 LTS or newer on a development computer:
 
 ```bash
 npm install
+npm install
+npm run prepare:mobile
 npx cap add android
 npx cap sync android
 npx cap open android
