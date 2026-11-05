@@ -42,6 +42,8 @@ jobs:
           node-version: "22"
       - name: Compile Python API modules
         run: python -m compileall -q api
+      - name: Run API security unit tests
+        run: python -m unittest discover -s api/tests -v
       - name: Check JavaScript syntax
         run: |
           find . -type f -name '*.js' ! -name 'video-studio.js' -print0 | xargs -0 -n1 node --check
