@@ -180,7 +180,7 @@ class ImageGenerateRequest(BaseModel):
 
 class ImageEditRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
-    image_base64: str = Field(min_length=100, max_length=16000000)
+    image_base64: str = Field(min_length=100, max_length=17000000)
     mime_type: str = Field(pattern="^(image/png|image/jpeg|image/webp)$")
 
 
