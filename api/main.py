@@ -17,7 +17,7 @@ from fastapi import Depends
 from starlette.concurrency import run_in_threadpool
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException\nfrom fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from groq import Groq
@@ -146,6 +146,57 @@ def health():
             "ltx_video_public": True,
         },
     }
+
+@app.post("/api/detector/text")
+def detect_ai_text(payload: AITextDetectRequest):
+    text_value = payload.text.strip()
+    if len(text_value.split()) < 50:
+        raise HTTPException(status_code=422, detail="النص قصير جداً. أدخل 50 كلمة على الأقل لتقليل النتائج المضللة.")
+    token = os.getenv("HF_TOKEN", "").strip()
+    if not token:
+        raise HTTPException(status_code=503, detail="كاشف النص يحتاج HF_TOKEN على الخادم. لم يتم إرسال النص إلى أي مزود.")
+    language = payload.language
+    if language == "auto":
+        arabic_chars = sum("\\u0600" <= ch <= "\\u06ff" for ch in text_value)
+        language = "ar" if arabic_chars / max(1, len(text_value)) > 0.12 else "en"
+    model = os.getenv("AI_DETECTOR_MODEL_AR" if language == "ar" else "AI_DETECTOR_MODEL_EN", "").strip()
+    if not model:
+        raise HTTPException(status_code=503, detail="لم يتم ضبط نموذج الكشف لهذه اللغة على الخادم.")
+    try:
+        response = requests.post(
+            "https://router.huggingface.co/hf-inference/models/" + model,
+            headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+            json={"inputs": text_value, "options": {"wait_for_model": True}},
+            timeout=90,
+        )
+        if response.status_code == 503:
+            raise HTTPException(status_code=503, detail="نموذج الكشف قيد التحميل أو غير متاح حالياً. حاول لاحقاً.")
+        response.raise_for_status()
+        result = response.json()
+        predictions = result[0] if isinstance(result, list) and result and isinstance(result[0], list) else result
+        if not isinstance(predictions, list) or not all(isinstance(x, dict) for x in predictions):
+            raise RuntimeError("Unexpected model response")
+        return {
+            "status": "model_response",
+            "language": language,
+            "model": model,
+            "predictions": [{"label": str(x.get("label", "unknown"))[:80], "score": float(x.get("score", 0))} for x in predictions[:10]],
+            "notice": "مؤشر احتمالي تجريبي وليس إثباتاً لمصدر النص. لا تستخدمه لاتخاذ قرار عقابي أو عالي المخاطر.",
+        }
+    except HTTPException:
+        raise
+    except requests.RequestException as exc:
+        logger.warning("AI detector provider request failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="تعذر الوصول إلى نموذج الكشف. تحقق من توفر النموذج وحصة Hugging Face.")
+    except Exception:
+        logger.exception("AI detector response could not be parsed")
+        raise HTTPException(status_code=502, detail="أعاد مزود الكشف استجابة غير متوقعة.")
+
+
+@app.post("/api/media")
+def upload_image_link(payload: ImageUploadRequest, user=Depends(lambda: None)):
+    raise HTTPException(status_code=501, detail="يجب تهيئة مصادقة الوسائط قبل الاستخدام.")
+
 
 @app.post("/api/chat")
 def chat(payload: ChatRequest):
@@ -347,7 +398,7 @@ class LoginRequest(BaseModel):
 class GoogleLoginRequest(BaseModel):
     credential: str = Field(min_length=20, max_length=10000)
 
-class TicketRequest(BaseModel):
+class AITextDetectRequest(BaseModel):\n    text: str = Field(min_length=100, max_length=12000)\n    language: str = Field(default="auto", pattern="^(auto|ar|en)$")\n\nclass ImageUploadRequest(BaseModel):\n    file_name: str = Field(min_length=1, max_length=160)\n    mime_type: str = Field(pattern="^(image/png|image/jpeg|image/webp)$")\n    image_base64: str = Field(min_length=100, max_length=7000000)\n\nclass TicketRequest(BaseModel):
     subject: str = Field(min_length=3, max_length=200)
     message: str = Field(min_length=10, max_length=5000)
 
