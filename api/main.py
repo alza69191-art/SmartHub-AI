@@ -484,7 +484,7 @@ def upload_image_link(payload: ImageUploadRequest, request: Request, user=Depend
         with db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(user["id"]),))
-                cur.execute("DELETE FROM image_assets WHERE user_id=%s AND expires_at < NOW()", (str(user["id"]),))
+                cur.execute("DELETE FROM image_assets WHERE expires_at < NOW()")
                 cur.execute(
                     "SELECT COUNT(*) AS total, COALESCE(SUM(octet_length(data)),0) AS used_bytes FROM image_assets WHERE user_id=%s AND expires_at>NOW()",
                     (str(user["id"]),),
