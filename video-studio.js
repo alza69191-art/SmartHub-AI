@@ -16,6 +16,13 @@ else if(op==="compress")args=["-i",inputs[0],"-vf","scale='min(1280,iw)':-2","-c
 else if(op==="convert")args=["-i",inputs[0],"-c:v","libx264","-preset","ultrafast","-crf","24","-c:a","aac",output];
 else if(op==="audio"){output="smarthub-audio.mp3";args=["-i",inputs[0],"-vn","-b:a","192k",output];}
 else if(op==="mute")args=["-i",inputs[0],"-an","-c:v","libx264","-preset","ultrafast","-crf","24",output];
+else if(op==="speed"){const speed=Math.max(.5,Math.min(2,Number($("speed").value)||1.5));args=["-i",inputs[0],"-vf","setpts="+(1/speed).toFixed(4)+"*PTS","-af","atempo="+speed,"-c:v","libx264","-preset","ultrafast","-crf","24","-c:a","aac",output];}
+else if(op==="reverse")args=["-i",inputs[0],"-vf","reverse","-af","areverse","-c:v","libx264","-preset","ultrafast","-crf","24","-c:a","aac",output];
+else if(op==="color"){const b=Math.max(-1,Math.min(1,Number($("brightness").value))),co=Math.max(.5,Math.min(2,Number($("contrast").value))),s=Math.max(0,Math.min(3,Number($("saturation").value)));args=["-i",inputs[0],"-vf","eq=brightness="+b+":contrast="+co+":saturation="+s,"-c:v","libx264","-preset","ultrafast","-crf","24","-c:a","aac",output];}
+else if(op==="crop"){const w=Math.max(2,Number($("cropWidth").value)||640),h=Math.max(2,Number($("cropHeight").value)||360),x=Math.max(0,Number($("cropX").value)||0),y=Math.max(0,Number($("cropY").value)||0);args=["-i",inputs[0],"-vf","crop="+w+":"+h+":"+x+":"+y,"-c:v","libx264","-preset","ultrafast","-crf","24","-c:a","aac",output];}
+else if(op==="gif"){output="smarthub-animation.gif";args=["-i",inputs[0],"-vf","fps=12,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse","-loop","0",output];}
+else if(op==="fade")args=["-i",inputs[0],"-af","afade=t=in:st=0:d=1","-c:v","copy","-c:a","aac",output];
+else if(op==="volume"){const v=Math.max(0,Math.min(3,Number($("volume").value)));args=["-i",inputs[0],"-af","volume="+v,"-c:v","copy","-c:a","aac",output];}
 else {const filter=op==="rotate90"?"transpose=1":op==="rotate180"?"hflip,vflip":"transpose=2";args=["-i",inputs[0],"-vf",filter,"-c:v","libx264","-preset","ultrafast","-crf","24","-c:a","aac",output];}
 say("جارٍ تنفيذ العملية: "+op+"…");const code=await ffmpeg.exec(args);if(code!==0)throw Error("تعذر تنفيذ العملية. قد لا يدعم ملفك الترميز المطلوب.");await finish(output,op==="audio"?"audio/mpeg":op==="gif"?"image/gif":"video/mp4");for(const n of [...inputs,"concat-list.txt",output]){try{await ffmpeg.deleteFile(n);}catch{}}}catch(e){say("فشلت المعالجة: "+(e.message||e)+"\nجرّب ملفاً أصغر أو صيغة فيديو مختلفة.");}finally{$("run").disabled=false;}});
 $("download").addEventListener("click",()=>{if(!resultUrl)return;const a=document.createElement("a");a.href=resultUrl;a.download=resultName;a.click();});
