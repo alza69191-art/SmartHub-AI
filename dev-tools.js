@@ -4,7 +4,7 @@ const show=(id,value)=>$(id).textContent=value;
 document.querySelectorAll("[data-open]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll("[data-open]").forEach(b=>b.classList.toggle("active",b===btn));document.querySelectorAll(".dev-tool").forEach(p=>p.classList.toggle("active",p.id===btn.dataset.open));}));
 $("jsonFormat").onclick=()=>{try{show("jsonOut",JSON.stringify(JSON.parse($("jsonIn").value),null,2));}catch(e){show("jsonOut","JSON غير صالح: "+e.message);}};
 $("jsonMin").onclick=()=>{try{show("jsonOut",JSON.stringify(JSON.parse($("jsonIn").value)));}catch(e){show("jsonOut","JSON غير صالح: "+e.message);}};
-$("b64Enc").onclick=()=>{try{show("b64Out",btoa(unescape(encodeURIComponent($("b64In").value)));}catch(e){show("b64Out","تعذر الترميز: "+e.message);}};
+$("b64Enc").onclick=()=>{try{show("b64Out",btoa(unescape(encodeURIComponent($("b64In").value))));}catch(e){show("b64Out","تعذر الترميز: "+e.message);}};
 $("b64Dec").onclick=()=>{try{show("b64Out",decodeURIComponent(escape(atob($("b64In").value.trim()))));}catch(e){show("b64Out","Base64 غير صالح أو ليس UTF-8.");}};
 $("urlEnc").onclick=()=>show("urlOut",encodeURIComponent($("urlIn").value));
 $("urlDec").onclick=()=>{try{show("urlOut",decodeURIComponent($("urlIn").value));}catch(e){show("urlOut","ترميز URL غير صالح.");}};
