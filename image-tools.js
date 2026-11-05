@@ -34,10 +34,10 @@
   candidate.onerror=()=>{if(sequence!==loadSequence)return;source=null;if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=null;fileInput.value="";say("fileInfo","تعذر فتح الصورة.");};candidate.src=sourceUrl;
  });
  function render(){
-  if(!source)return;
+  if(!source)return false;
   const r=cropRect(),w=val("width",r.w,1,12000),h=val("height",r.h,1,12000),rotation=Number($("rotation").value)||0;
   const swap=rotation===90||rotation===270;
-  if(w*h>MAX_OUTPUT_PIXELS){say("resultInfo","الأبعاد المطلوبة تتجاوز 24 ميغابكسل. قلّل العرض أو الارتفاع.");$("download").disabled=true;outputBlob=null;return;}
+  if(w*h>MAX_OUTPUT_PIXELS){say("resultInfo","الأبعاد المطلوبة تتجاوز 24 ميغابكسل. قلّل العرض أو الارتفاع.");$("download").disabled=true;outputBlob=null;return false;}
   canvas.width=swap?h:w;canvas.height=swap?w:h;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();ctx.filter="brightness("+val("brightness",100,50,150)+"%) contrast("+val("contrast",100,50,150)+"%)";
@@ -52,13 +52,13 @@
   }else if(amount>0){say("resultInfo","تم تجاوز تطبيق الحدة لتجنب استهلاك ذاكرة كبير؛ خفّض الأبعاد.");}
   const mark=$("watermark").value.trim();
   if(mark){const size=Math.max(16,Math.round(canvas.width*.035));ctx.save();ctx.globalAlpha=val("watermarkOpacity",65,10,100)/100;ctx.fillStyle=$("watermarkColor").value;ctx.font="bold "+size+"px sans-serif";ctx.textAlign="right";ctx.textBaseline="bottom";ctx.shadowColor="#000";ctx.shadowBlur=Math.max(2,size*.12);ctx.fillText(mark,canvas.width-size*.6,canvas.height-size*.6,canvas.width-size*1.2);ctx.restore();}
-  canvas.hidden=false;
+  canvas.hidden=false;return true;
  }
  ["rotation","flipX","flipY","watermark","watermarkColor","cropX","cropY","cropW","cropH"].forEach(id=>$(id).addEventListener("change",()=>{if(source)render();}));
  $("watermark").addEventListener("input",()=>{if(source)render();});
  ["brightness","contrast","sharpness"].forEach(id=>$(id).addEventListener("input",()=>{if(source)render();}));
  $("process").addEventListener("click",()=>{
-  if(!source)return;render();const type=$("format").value,q=Number($("quality").value)/100;
+  if(!source||!render())return;const type=$("format").value,q=Number($("quality").value)/100;
   canvas.toBlob(blob=>{if(!blob){say("resultInfo","تعذر تصدير الصورة بهذه الصيغة؛ جرّب PNG أو JPEG.");return;}outputBlob=blob;$("download").disabled=false;say("resultInfo","الحجم الناتج: "+bytes(blob.size)+" — الأبعاد: "+canvas.width+" × "+canvas.height+" — "+blob.type);},type,type==="image/png"?undefined:q);
  });
  $("download").addEventListener("click",()=>{if(!outputBlob)return;const url=URL.createObjectURL(outputBlob),a=document.createElement("a"),ext=outputBlob.type==="image/png"?"png":outputBlob.type==="image/jpeg"?"jpg":"webp";a.href=url;a.download="smarthub-image."+ext;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
