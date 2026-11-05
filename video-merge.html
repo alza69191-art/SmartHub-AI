@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="دمج عدة مقاطع فيديو محلياً في المتصفح دون رفع الملفات.">
+<title>دمج الفيديو مجاناً | SmartHub AI</title><link rel="stylesheet" href="styles.css">
+<style>
+.merge-list{display:grid;gap:8px;margin-top:12px}.merge-item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border,#ddd);border-radius:10px}.merge-item button{margin-inline-start:auto}.merge-item small{opacity:.7}.preview-canvas{width:100%;max-height:420px;background:#000;border-radius:12px;margin-top:14px}
+</style>
+</head>
+<body>
+<header class="site-header"><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><nav class="top-nav"><a class="top-link" href="index.html">الرئيسية</a><a class="top-link active" href="tools.html">الأدوات</a><a class="top-link" href="account.html">الحساب</a></nav></header>
+<main class="standalone-page"><section>
+<div class="heading"><div><small>FREE BROWSER VIDEO TOOL</small><h1>دمج مقاطع الفيديو</h1><p>اختر عدة مقاطع ورتّبها ثم ادمجها في فيديو واحد. تتم المعالجة على جهازك ولا تُرفع الملفات إلى الخادم.</p></div></div>
+<div class="support-card">
+<label class="label" for="videoFiles">اختر مقطعين أو أكثر</label><input id="videoFiles" class="search" type="file" accept="video/*" multiple>
+<p id="fileInfo" class="hint" aria-live="polite">لم يتم اختيار ملفات.</p><div id="mergeList" class="merge-list"></div>
+<div class="actions"><button id="merge" class="action" disabled>دمج المقاطع</button><button id="download" class="action alt" disabled>تنزيل الفيديو الناتج</button></div>
+<p id="status" class="hint" role="status" aria-live="polite">اختر المقاطع للبدء.</p><canvas id="preview" class="preview-canvas" width="1280" height="720" hidden></canvas>
+</div>
+<div class="support-card" style="margin-top:16px"><h2>ملاحظات مهمة</h2><p>الناتج بصيغة WebM ويعتمد على دعم المتصفح لـ Canvas captureStream وMediaRecorder وWeb Audio. تتم مطابقة أبعاد المقاطع مع مساحة إخراج واحدة، وقد تختلف الجودة عن الملفات الأصلية.</p><p class="hint">هذه نسخة أولية للدمج التسلسلي؛ لا تتضمن انتقالات أو مسارات متعددة أو مؤثرات احترافية. يفضّل تجربة ملفات قصيرة أولاً.</p></div>
+</section></main>
+<footer><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><span>© 2026 SmartHub AI</span></footer><script src="video-merge.js"></script></body></html>
