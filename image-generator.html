@@ -2,8 +2,8 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="توليد الصور باستخدام FLUX.1 schnell داخل SmartHub AI">
-<title>مولّد الصور FLUX.1 schnell | SmartHub AI</title>
+<meta name="description" content="توليد الصور عبر مزودين مختلفين داخل SmartHub AI">
+<title>مولّد الصور | SmartHub AI</title>
 <link rel="stylesheet" href="styles.css">
 <style>
 .generator{max-width:900px;margin:36px auto;padding:24px}
@@ -26,8 +26,9 @@
 <body>
 <header class="site-header"><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><nav class="top-nav"><a class="top-link" href="index.html">الرئيسية</a><a class="top-link" href="tools.html">الأدوات</a><a class="top-link" href="assistant.html">المساعد الذكي</a></nav><div class="header-actions"><a class="register-nav-button" href="account.html">الحساب</a></div></header>
 <main class="generator"><section class="generator-card">
-<small>POWERED BY CLOUDFLARE</small><h1>مولّد الصور FLUX.1 schnell</h1><p class="muted">اكتب وصف الصورة باللغة العربية أو الإنجليزية. يلزم تسجيل الدخول لاستخدام المولّد.</p>
+<small>OVHCLOUD · POLLINATIONS · CLOUDFLARE</small><h1>مولّد الصور</h1><p class="muted">اكتب وصف الصورة باللغة العربية أو الإنجليزية. يلزم تسجيل الدخول لاستخدام المولّد.</p>
 <label for="prompt">وصف الصورة</label><textarea id="prompt" maxlength="4000" placeholder="صف الصورة التي تريد إنشاءها بالتفصيل..."></textarea>
+<label for="provider">مزود توليد الصور</label><select id="provider"><option value="ovh">OVHcloud – Stable Diffusion XL (تجربة مجانية)</option><option value="pollinations">Pollinations – FLUX (يتطلب مفتاحاً)</option><option value="cloudflare">Cloudflare – FLUX (يتطلب مفتاحاً)</option></select>
 <label for="quality">عدد خطوات التوليد</label><select id="quality"><option value="speed">سريعة – 4 خطوات</option><option value="quality">تفاصيل أكثر – 8 خطوات</option></select>
 <button id="generate" type="button">إنشاء الصورة</button><p id="status" role="status"></p>
 <div id="result"><img id="output" alt="الصورة المولدة"><a id="download" download="smarthub-qwen-image.png">تنزيل الصورة</a></div>
