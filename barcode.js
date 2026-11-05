@@ -62,10 +62,12 @@
   const file=$("imageToQr").files?.[0];if(!file){say("اختر صورة أولاً.");return;}
   try{
    if(!file.type.startsWith("image/"))throw Error("الملف المحدد ليس صورة.");
-   const bitmap=await createImageBitmap(file),c=document.createElement("canvas"),cx=c.getContext("2d");
-   c.width=48;c.height=48;cx.fillStyle="#fff";cx.fillRect(0,0,48,48);
-   const scale=Math.min(48/bitmap.width,48/bitmap.height),w=bitmap.width*scale,h=bitmap.height*scale;
-   cx.drawImage(bitmap,(48-w)/2,(48-h)/2,w,h);bitmap.close();
+   const bitmap=await createImageBitmap(file),c=document.createElement("canvas");
+   try{const cx=c.getContext("2d");if(!cx)throw Error("تعذر تجهيز الصورة.");
+    c.width=48;c.height=48;cx.fillStyle="#fff";cx.fillRect(0,0,48,48);
+    const scale=Math.min(48/bitmap.width,48/bitmap.height),w=bitmap.width*scale,h=bitmap.height*scale;
+    cx.drawImage(bitmap,(48-w)/2,(48-h)/2,w,h);
+   }finally{bitmap.close();}
    const blob=await new Promise(resolve=>c.toBlob(resolve,"image/jpeg",.2));if(!blob)throw Error("تعذر ضغط الصورة.");
    const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error("تعذر قراءة الصورة."));reader.readAsDataURL(blob);});
    if(dataUrl.length>1700)throw Error("الصورة لا تزال كبيرة على سعة QR. اختر صورة أبسط أو أصغر.");
