@@ -313,3 +313,8 @@ main,footer{margin-right:0}
 .minimal-composer textarea::placeholder{color:#888}
 .minimal-composer button{background:#222;border-radius:6px;font-size:14px}
 @media(max-width:600px){.minimal-assistant{padding:10px}.minimal-message{max-width:96%}}
+
+
+/* Remember-me control on the sign-in form */
+.auth-card label.remember-option{display:flex;align-items:center;gap:.65rem;margin:.35rem 0 1rem;font-size:.92rem;color:var(--muted,#aab2c5);cursor:pointer}
+.remember-option input[type=checkbox]{width:1rem;height:1rem;margin:0;accent-color:var(--accent,#8b7cff);flex:0 0 auto}

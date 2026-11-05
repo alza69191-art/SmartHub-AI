@@ -12,8 +12,9 @@
     const res=await fetch(api+"/api/auth/google",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({credential:response.credential})});
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw Error(data.detail||"تعذر تسجيل الدخول عبر Google");
-    sessionStorage.setItem("sh-token",data.token);
-    sessionStorage.setItem("sh-user",JSON.stringify(data.user));
+    const storage=document.getElementById("rememberLogin")?.checked?localStorage:sessionStorage;
+    storage.setItem("sh-token",data.token);
+    storage.setItem("sh-user",JSON.stringify(data.user));
     location.href="support.html";
    }catch(error){
     const msg=document.getElementById("accountMessage");
