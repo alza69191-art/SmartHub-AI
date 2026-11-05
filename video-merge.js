@@ -38,8 +38,8 @@
    const draw=()=>{if(!drawing)return;if(video.readyState>=2){ctx.fillStyle="#000";ctx.fillRect(0,0,width,height);const scale=Math.min(width/video.videoWidth,height/video.videoHeight),w=video.videoWidth*scale,h=video.videoHeight*scale;ctx.drawImage(video,(width-w)/2,(height-h)/2,w,h);}raf=requestAnimationFrame(draw);};
    draw();
    for(let i=0;i<urls.length;i++){
-    video.pause();video.src=urls[i];video.load();await waitEvent(video,"loadedmetadata");await video.play();
-    await new Promise((resolve,reject)=>{video.onended=resolve;video.onerror=()=>reject(Error("تعذر تشغيل المقطع رقم "+(i+1)));});
+    video.pause();video.src=urls[i];video.load();await waitEvent(video,"loadedmetadata");
+    await new Promise(async(resolve,reject)=>{video.onended=resolve;video.onerror=()=>reject(Error("تعذر تشغيل المقطع رقم "+(i+1)));try{await video.play();}catch(e){reject(e);}});
    }
    drawing=false;cancelAnimationFrame(raf);recorder.stop();await stopped;
    const blob=new Blob(chunks,{type:mime});if(!blob.size)throw Error("لم يتم إنشاء ملف؛ جرّب ملفات أخرى أو متصفحاً حديثاً.");
