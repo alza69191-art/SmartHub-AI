@@ -69,7 +69,8 @@
    const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error("تعذر قراءة الصورة."));reader.readAsDataURL(blob);});
    if(dataUrl.length>1700)throw Error("الصورة لا تزال كبيرة على سعة QR. اختر صورة أبسط أو أصغر.");
    $("codeType").value="qr";$("codeText").value=dataUrl;$("makeCode").click();
-   say("تم تجهيز QR بصورة مصغرة مضمّنة. افحصه بهاتفك وتأكد من دعم قارئك لبيانات data URL.");
+   if(!$("codeOutput").querySelector("canvas,img"))throw Error($("codeOutput").textContent||"تعذر إنشاء QR لهذه الصورة.");
+   say("تم إنشاء QR بصورة مصغرة مضمّنة. افحصه بهاتفك وتأكد من دعم قارئك لبيانات data URL.");
   }catch(err){say(err.message||"تعذر تحويل الصورة.");}
  });
  window.addEventListener("pagehide",stop);
