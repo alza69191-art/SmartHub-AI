@@ -1,6 +1,7 @@
 (() => {
  const $=id=>document.getElementById(id),fileInput=$("imageFile"),canvas=$("preview"),ctx=canvas.getContext("2d",{willReadFrequently:true});
- let source=null,sourceUrl=null,outputBlob=null;\n const MAX_OUTPUT_PIXELS=24000000;
+ let source=null,sourceUrl=null,outputBlob=null;
+ const MAX_OUTPUT_PIXELS=24000000;
  const say=(id,msg)=>$(id).textContent=msg;
  const bytes=n=>n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(2)+" MB";
  const val=(id,fallback,min,max)=>Math.max(min,Math.min(max,Number($(id).value)||fallback));
@@ -23,7 +24,8 @@
  $("height").addEventListener("input",()=>{if(source&&$("keepRatio").checked){const r=cropRect();$("width").value=Math.max(1,Math.round((Number($("height").value)||r.h)*r.w/r.h));}});
  fileInput.addEventListener("change",()=>{
   const file=fileInput.files&&fileInput.files[0];if(!file)return;
-  if(!file.type.startsWith("image/")){say("fileInfo","الملف المحدد ليس صورة.");return;}\n  if(file.size>25*1024*1024){say("fileInfo","حجم الصورة يتجاوز 25 ميغابايت لتجنب استهلاك ذاكرة المتصفح.");return;}
+  if(!file.type.startsWith("image/")){say("fileInfo","الملف المحدد ليس صورة.");return;}
+  if(file.size>25*1024*1024){say("fileInfo","حجم الصورة يتجاوز 25 ميغابايت لتجنب استهلاك ذاكرة المتصفح.");return;}
   if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=URL.createObjectURL(file);source=new Image();
   source.onload=()=>{if(source.naturalWidth*source.naturalHeight>MAX_OUTPUT_PIXELS){say("fileInfo","أبعاد الصورة تتجاوز 24 ميغابكسل؛ اختر صورة أصغر.");source=null;return;}["cropX","cropY"].forEach(id=>$(id).value=0);["cropW","cropH"].forEach(id=>$(id).value=100);updateDimensions();$("process").disabled=false;$("download").disabled=true;outputBlob=null;say("fileInfo",file.name+" — "+source.naturalWidth+" × "+source.naturalHeight+" — "+bytes(file.size));render();};
   source.onerror=()=>say("fileInfo","تعذر فتح الصورة.");source.src=sourceUrl;
@@ -31,7 +33,9 @@
  function render(){
   if(!source)return;
   const r=cropRect(),w=val("width",r.w,1,12000),h=val("height",r.h,1,12000),rotation=Number($("rotation").value)||0;
-  const swap=rotation===90||rotation===270;\n  if(w*h>MAX_OUTPUT_PIXELS){say("resultInfo","الأبعاد المطلوبة تتجاوز 24 ميغابكسل. قلّل العرض أو الارتفاع.");$("download").disabled=true;outputBlob=null;return;}\n  canvas.width=swap?h:w;canvas.height=swap?w:h;
+  const swap=rotation===90||rotation===270;
+  if(w*h>MAX_OUTPUT_PIXELS){say("resultInfo","الأبعاد المطلوبة تتجاوز 24 ميغابكسل. قلّل العرض أو الارتفاع.");$("download").disabled=true;outputBlob=null;return;}
+  canvas.width=swap?h:w;canvas.height=swap?w:h;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();ctx.filter="brightness("+val("brightness",100,50,150)+"%) contrast("+val("contrast",100,50,150)+"%)";
   ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(rotation*Math.PI/180);
