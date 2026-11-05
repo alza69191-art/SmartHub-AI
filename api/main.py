@@ -17,7 +17,7 @@ from fastapi import Depends
 from starlette.concurrency import run_in_threadpool
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
-from fastapi import FastAPI, HTTPException\nfrom fastapi.responses import Response
+from fastapi import FastAPI, HTTPException\nfrom fastapi.responses import Response\nfrom fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from groq import Groq
@@ -454,7 +454,7 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
 
 
 @app.post("/api/media")
-def upload_image_link(payload: ImageUploadRequest, request, user=Depends(current_user)):
+def upload_image_link(payload: ImageUploadRequest, request: Request, user=Depends(current_user)):
     try:
         raw = base64.b64decode(payload.image_base64, validate=True)
     except Exception:
