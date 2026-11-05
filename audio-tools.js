@@ -1,14 +1,14 @@
 (() => {
  const $=id=>document.getElementById(id);let context=null,merged=null,blobUrl=null;
- const say=t=>$("status").textContent=t;
+ const say=t=>$("status").textContent=t; $("volume").addEventListener("input",()=>$("volumeValue").textContent=$("volume").value+"%");
  const getContext=()=>context||(context=new (window.AudioContext||window.webkitAudioContext)());
- const wav=(buffer,start,end)=>{
+ const wav=(buffer,start,end,volume=1,fadeIn=0,fadeOut=0)=>{
   const rate=buffer.sampleRate,from=Math.floor(start*rate),to=Math.min(buffer.length,Math.floor(end*rate)),length=to-from,channels=buffer.numberOfChannels;
   if(length<=0)throw Error("نطاق القص غير صالح.");
   const bytes=44+length*channels*2,view=new DataView(new ArrayBuffer(bytes));let p=0;
   const str=s=>{for(let i=0;i<s.length;i++)view.setUint8(p++,s.charCodeAt(i));};
   str("RIFF");view.setUint32(p,bytes-8,true);p+=4;str("WAVEfmt ");view.setUint32(p,16,true);p+=4;view.setUint16(p,1,true);p+=2;view.setUint16(p,channels,true);p+=2;view.setUint32(p,rate,true);p+=4;view.setUint32(p,rate*channels*2,true);p+=4;view.setUint16(p,channels*2,true);p+=2;view.setUint16(p,16,true);p+=2;str("data");view.setUint32(p,length*channels*2,true);p+=4;
-  for(let i=0;i<length;i++)for(let c=0;c<channels;c++){let v=Math.max(-1,Math.min(1,buffer.getChannelData(c)[from+i]));view.setInt16(p,v<0?v*32768:v*32767,true);p+=2;}
+  for(let i=0;i<length;i++)for(let c=0;c<channels;c++){let gain=volume;if(fadeIn>0)gain*=Math.min(1,i/rate/fadeIn);if(fadeOut>0)gain*=Math.min(1,(length-1-i)/rate/fadeOut);let v=Math.max(-1,Math.min(1,buffer.getChannelData(c)[from+i]*gain));view.setInt16(p,v<0?v*32768:v*32767,true);p+=2;}
   return new Blob([view],{type:"audio/wav"});
  };
  $("audioFiles").addEventListener("change",()=>{$("join").disabled=!$("audioFiles").files.length;$("audioInfo").textContent=$("audioFiles").files.length+" ملف/ملفات محددة.";});
@@ -26,7 +26,7 @@
   }catch(e){say(e.message||"تعذر معالجة الملفات.");}
   finally{$("join").disabled=false;}
  };
- $("play").onclick=()=>{if(!merged)return;const b=wav(merged,Number($("start").value),Number($("end").value));if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(b);$("preview").src=blobUrl;$("preview").style.display="block";$("preview").play();};
- $("export").onclick=()=>{if(!merged)return;try{const b=wav(merged,Number($("start").value),Number($("end").value));const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="smarthub-audio.wav";a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);say("تم تجهيز ملف WAV للتنزيل.");}catch(e){say(e.message);}};
+ $("play").onclick=()=>{if(!merged)return;const b=wav(merged,Number($("start").value),Number($("end").value),Number($("volume").value)/100,Number($("fadeIn").value),Number($("fadeOut").value));if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(b);$("preview").src=blobUrl;$("preview").style.display="block";$("preview").play();};
+ $("export").onclick=()=>{if(!merged)return;try{const b=wav(merged,Number($("start").value),Number($("end").value),Number($("volume").value)/100,Number($("fadeIn").value),Number($("fadeOut").value));const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="smarthub-audio.wav";a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);say("تم تجهيز ملف WAV للتنزيل.");}catch(e){say(e.message);}};
  window.addEventListener("pagehide",()=>{if(blobUrl)URL.revokeObjectURL(blobUrl);if(context)context.close();});
 })();
