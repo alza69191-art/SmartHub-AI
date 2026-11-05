@@ -164,7 +164,7 @@ def detect_ai_text(payload: AITextDetectRequest):
     if language == "auto":
         arabic_chars = sum("\u0600" <= ch <= "\u06ff" for ch in text_value)
         language = "ar" if arabic_chars / max(1, len(text_value)) > 0.12 else "en"
-    model = os.getenv("AI_DETECTOR_MODEL_AR" if language == "ar" else "AI_DETECTOR_MODEL_EN", "").strip()
+    model = os.getenv("AI_DETECTOR_MODEL_AR" if language == "ar" else "AI_DETECTOR_MODEL_EN", "Rashidbm/farras-xlmr-arabic-ai-detector" if language == "ar" else "Hello-SimpleAI/chatgpt-detector-roberta").strip()
     if not model:
         raise HTTPException(status_code=503, detail="لم يتم ضبط نموذج الكشف لهذه اللغة على الخادم.")
     try:
