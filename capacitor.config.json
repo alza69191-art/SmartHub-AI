@@ -1,0 +1,11 @@
+{
+  "appId": "com.smarthubai.app",
+  "appName": "SmartHub AI",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
