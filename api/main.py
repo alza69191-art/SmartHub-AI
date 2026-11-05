@@ -389,7 +389,6 @@ class RegisterRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=10, max_length=128)
     display_name: str = Field(min_length=2, max_length=80)
-    admin_setup_key: str = Field(default="", max_length=200)
 
 class LoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
@@ -592,9 +591,7 @@ def register(payload: RegisterRequest):
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=422, detail="البريد الإلكتروني غير صالح")
     user_id = uuid.uuid4()
-    setup_key = os.getenv("ADMIN_SETUP_KEY", "")
-    is_admin = bool(setup_key) and admin_email(email) and hmac.compare_digest(payload.admin_setup_key, setup_key)
-    role = "admin" if is_admin else "user"
+    role = "user"
     try:
         with db_connect() as conn:
             with conn.cursor() as cur:
