@@ -394,6 +394,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=1, max_length=128)
+    remember_me: bool = False
 
 class GoogleLoginRequest(BaseModel):
     credential: str = Field(min_length=20, max_length=10000)
@@ -439,11 +440,12 @@ def admin_email(email):
     allowed = {x.strip().lower() for x in os.getenv("ADMIN_EMAILS", "").split(",") if x.strip()}
     return email.lower() in allowed
 
-def make_token(profile):
+def make_token(profile, remember_me=False):
     ensure_auth_config()
     now = datetime.now(timezone.utc)
+    lifetime = timedelta(days=30) if remember_me else timedelta(hours=24)
     return jwt.encode({"sub": str(profile["id"]), "iat": now,
-                       "exp": now + timedelta(hours=24)}, JWT_SECRET, algorithm="HS256")
+                       "exp": now + lifetime}, JWT_SECRET, algorithm="HS256")
 
 def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
     ensure_auth_config()
@@ -676,7 +678,7 @@ def login(payload: LoginRequest):
             role = "admin" if (profile["role"] == "admin" and admin_email(email)) else "user"
             cur.execute("UPDATE profiles SET role=%s WHERE id=%s RETURNING id,email,display_name,role,created_at", (role,str(profile["id"])))
             profile = cur.fetchone()
-    return {"token": make_token(profile), "user": profile}
+    return {"token": make_token(profile, payload.remember_me), "user": profile}
 
 @app.get("/api/auth/me")
 def me(user=Depends(current_user)):
