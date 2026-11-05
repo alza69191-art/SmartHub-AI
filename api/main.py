@@ -900,7 +900,8 @@ def generate_video(payload: VideoGenerateRequest, user=Depends(current_user)):
             job for job in _video_jobs.values()
             if job.get("status") in {"queued", "running"}
         ]
-        if any(job.get("owner_id") == str(user["id"]) for job in active_jobs):
+        user_active_jobs = sum(1 for job in active_jobs if job.get("owner_id") == str(user["id"]))
+        if user_active_jobs >= _VIDEO_MAX_ACTIVE_PER_USER:
             raise HTTPException(status_code=429, detail="لديك مهمة فيديو قيد التنفيذ. انتظر اكتمالها قبل إرسال مهمة أخرى.")
         if len(active_jobs) >= _VIDEO_MAX_ACTIVE_GLOBAL:
             raise HTTPException(status_code=503, detail="طابور توليد الفيديو مشغول حالياً. حاول بعد قليل.")
