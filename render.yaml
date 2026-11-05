@@ -33,4 +33,4 @@ services:
       - key: ADMIN_SETUP_KEY
         sync: false
       - key: FRONTEND_ORIGIN
-        value: "*"
+        value: "https://alza69191-art.github.io"
