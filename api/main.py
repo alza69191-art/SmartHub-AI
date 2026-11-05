@@ -484,6 +484,13 @@ def upload_image_link(payload: ImageUploadRequest, request: Request, user=Depend
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM image_assets WHERE expires_at < NOW()")
                 cur.execute(
+                    "SELECT COUNT(*) AS total, COALESCE(SUM(octet_length(data)),0) AS used_bytes FROM image_assets WHERE user_id=%s AND expires_at>NOW()",
+                    (str(user["id"]),),
+                )
+                quota = cur.fetchone()
+                if quota["total"] >= 10 or quota["used_bytes"] + len(raw) > 25 * 1024 * 1024:
+                    raise HTTPException(status_code=429, detail="وصلت إلى حد المشاركة: 10 صور أو 25 ميغابايت نشطة لكل حساب.")
+                cur.execute(
                     """INSERT INTO image_assets (id,user_id,file_name,content_type,data,expires_at)
                        VALUES (%s,%s,%s,%s,%s,NOW()+INTERVAL '30 days') RETURNING expires_at""",
                     (asset_id, str(user["id"]), safe_name, payload.mime_type, psycopg.Binary(raw)),
