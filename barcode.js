@@ -47,8 +47,8 @@
     const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");out.append(svg);
     JsBarcode(svg,value,{format:"CODE128",displayValue:true,margin:12});
    }
-   $("downloadCode").disabled=false;
-  }catch(err){out.textContent=err.message;$("downloadCode").disabled=true;}
+   $("downloadCode").disabled=false;$("downloadCode").textContent=type==="qr"?"تنزيل QR":"تنزيل الباركود SVG";
+  }catch(err){out.textContent=err.message;$("downloadCode").disabled=true;$("downloadCode").textContent="تنزيل";}
  };
  $("downloadCode").onclick=()=>{
   const out=$("codeOutput"),svg=out.querySelector("svg");
