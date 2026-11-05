@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="تعديل الصور باستخدام Google Gemini داخل SmartHub AI">
+<title>تعديل الصور | SmartHub AI</title><link rel="stylesheet" href="styles.css">
+<style>
+.editor{max-width:900px;margin:36px auto;padding:24px}.editor-card{background:linear-gradient(145deg,#321c60,#21123f);border:1px solid var(--line);border-radius:18px;padding:24px}
+.editor h1{margin:4px 0 8px}.muted{color:var(--muted)}.editor textarea,.editor input{width:100%;background:#160d30;color:#fff;border:1px solid var(--line);border-radius:10px;padding:13px;font:15px Tajawal}
+.editor textarea{min-height:130px;resize:vertical}.editor label{display:block;margin:14px 0 6px;color:#e0d4f6}
+.editor button{margin-top:18px;background:linear-gradient(120deg,#9259e8,#6338bb);border:0;color:#fff;padding:12px 22px;border-radius:10px;font-weight:700}
+.editor button:disabled{opacity:.55;cursor:wait}#status{min-height:26px;color:var(--muted);margin:12px 0}
+#preview{display:none;max-width:100%;max-height:360px;margin-top:16px;border-radius:12px}#result{display:none;margin-top:22px;text-align:center}
+#output{display:block;max-width:100%;max-height:720px;margin:0 auto;border-radius:12px;border:1px solid var(--line)}
+#download{display:inline-block;margin-top:12px;color:var(--purple-light)}
+@media(max-width:600px){.editor{padding:16px}.editor-card{padding:17px}}
+</style></head><body>
+<header class="site-header"><a class="logo" href="index.html">✦ SmartHub <b>AI</b></a><nav class="top-nav"><a class="top-link" href="index.html">الرئيسية</a><a class="top-link" href="tools.html">الأدوات</a><a class="top-link" href="assistant.html">المساعد الذكي</a></nav><div class="header-actions"><a class="register-nav-button" href="account.html">الحساب</a></div></header>
+<main class="editor"><section class="editor-card"><small>GOOGLE GEMINI · NANO BANANA 2</small><h1>معدّل الصور بالذكاء الاصطناعي</h1><p class="muted">ارفع صورة واكتب ما تريد تغييره. يمكنك إضافة أو إزالة عناصر أو تغيير الخلفية والأسلوب والألوان.</p>
+<label for="image">اختر الصورة (PNG أو JPG أو WEBP، حتى 12 MB)</label><input id="image" type="file" accept="image/png,image/jpeg,image/webp"><img id="preview" alt="معاينة الصورة الأصلية">
+<label for="prompt">تعليمات التعديل</label><textarea id="prompt" maxlength="4000" placeholder="مثال: احذف الخلفية واستبدلها بشاطئ وقت الغروب مع الحفاظ على الشخص كما هو..."></textarea>
+<button id="edit" type="button">تعديل الصورة</button><p id="status" role="status"></p>
+<div id="result"><img id="output" alt="الصورة بعد التعديل"><a id="download" download="smarthub-edited-image.png">تنزيل الصورة المعدّلة</a></div>
+</section></main><script src="config.js"></script><script src="image-editor.js"></script></body></html>

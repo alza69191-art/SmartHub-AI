@@ -15,7 +15,6 @@ from psycopg.rows import dict_row
 from jose import jwt, JWTError
 from fastapi import Depends
 from starlette.concurrency import run_in_threadpool
-from gradio_client import Client
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
 from fastapi import FastAPI, HTTPException
@@ -138,6 +137,10 @@ def health():
             "groq": bool(os.getenv("GROQ_API_KEY")),
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "huggingface": bool(os.getenv("HF_TOKEN")),
+            "cloudflare_image": bool(os.getenv("CLOUDFLARE_ACCOUNT_ID") and os.getenv("CLOUDFLARE_API_TOKEN")),
+            "ovh_image": True,
+            "pollinations_image": bool(os.getenv("POLLINATIONS_API_KEY")),
+            "gemini_image": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "ltx_video_public": True,
         },
     }
@@ -168,91 +171,160 @@ def chat(payload: ChatRequest):
     )
 
 
-# Qwen Image 2.1 generation through the official public Hugging Face Space.
-_qwen_client = None
-_qwen_lock = threading.Lock()
-
+# Image generation through OVHcloud SDXL, Pollinations FLUX, or Cloudflare FLUX.
 class ImageGenerateRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
-    enhance_prompt: bool = True
+    provider: str = Field(default="gemini", pattern="^(gemini|ovh|pollinations|cloudflare)$")
     quality: str = Field(default="speed", pattern="^(speed|quality)$")
-    custom_size: bool = False
-    width: int = Field(default=1024, ge=256, le=2688)
-    height: int = Field(default=1024, ge=256, le=2688)
-    negative_prompt: str = Field(default="", max_length=1500)
-    seed: int = Field(default=0, ge=0, le=2147483647)
 
-def get_qwen_client():
-    global _qwen_client
-    if _qwen_client is None:
-        token = os.getenv("HF_TOKEN", "").strip() or None
-        _qwen_client = Client(
-            "Qwen/Qwen-Image-2.1",
-            hf_token=token,
-            httpx_kwargs={"timeout": 600},
-            verbose=False,
-        )
-    return _qwen_client
 
-def qwen_image_to_data_url(result):
-    # Gradio Image outputs are normally downloaded to a local filepath.
-    if isinstance(result, (tuple, list)) and result:
-        result = result[0]
-    if isinstance(result, dict):
-        result = result.get("path") or result.get("url")
-    if not isinstance(result, str):
-        raise RuntimeError("Qwen returned an unsupported image result")
-    if result.startswith("http://") or result.startswith("https://"):
-        image_response = requests.get(result, timeout=90)
-        image_response.raise_for_status()
-        raw = image_response.content
-    else:
-        with open(result, "rb") as image_file:
-            raw = image_file.read()
-    if not raw:
-        raise RuntimeError("Qwen returned an empty image")
-    return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+class ImageEditRequest(BaseModel):
+    prompt: str = Field(min_length=3, max_length=4000)
+    image_base64: str = Field(min_length=100, max_length=17000000)
+    mime_type: str = Field(pattern="^(image/png|image/jpeg|image/webp)$")
 
-def generate_qwen_image(payload):
-    # The Space uses a two-stage flow: prepare_request creates request_state,
-    # then generate_request consumes that state to run the GPU generation.
-    with _qwen_lock:
-        client = get_qwen_client()
-        prepared = client.predict(
-            input_images=None,
-            original_prompt=payload.prompt,
-            enable_extend=payload.enhance_prompt,
-            custom_size=payload.custom_size,
-            quality=payload.quality,
-            seed=payload.seed,
-            randomize_seed=True,
-            api_name="/prepare_request",
-        )
-        # gradio_client excludes gr.State outputs and manages state internally
-        # for the same Client session. The visible prepare outputs are:
-        # placeholder image, seed, and rewritten prompt.
-        if not isinstance(prepared, (tuple, list)) or len(prepared) < 3:
-            raise RuntimeError(
-                f"Unexpected Qwen prepare response: {type(prepared).__name__}"
-            )
-        actual_seed = prepared[1]
-        image_result = client.predict(
-            original_prompt=payload.prompt,
-            enable_extend=payload.enhance_prompt,
-            custom_size=payload.custom_size,
-            log_dir="./generation_logs_paper_case",
-            seed=actual_seed,
-            height=payload.height,
-            width=payload.width,
-            negative_prompt=payload.negative_prompt or " ",
-            api_name="/generate_request",
-        )
-        return {
-            "image": qwen_image_to_data_url(image_result),
-            "seed": actual_seed,
-            "model": "Qwen Image 2.1",
-            "enhanced_prompt": prepared[2] or "",
-        }
+
+def image_data_uri(image_bytes, content_type="image/png"):
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return "data:" + content_type + ";base64," + encoded
+
+
+def extract_gemini_image(data):
+    for candidate in data.get("candidates", []):
+        for part in candidate.get("content", {}).get("parts", []):
+            inline = part.get("inlineData") or part.get("inline_data") or {}
+            encoded = inline.get("data")
+            mime = inline.get("mimeType") or inline.get("mime_type") or "image/png"
+            if encoded:
+                return image_data_uri(base64.b64decode(encoded), mime)
+    raise RuntimeError("Google Gemini returned no image data")
+
+
+def call_gemini_image(parts):
+    key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+    response = requests.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent",
+        params={"key": key},
+        json={
+            "contents": [{"parts": parts}],
+            "generationConfig": {"responseModalities": ["IMAGE"]},
+        },
+        timeout=240,
+    )
+    if not response.ok:
+        logger.error("Gemini image API returned HTTP %s: %s", response.status_code, response.text[:1200])
+    response.raise_for_status()
+    return extract_gemini_image(response.json())
+
+
+def generate_gemini_image(payload):
+    image = call_gemini_image([{"text": payload.prompt.strip()}])
+    return {
+        "image": image,
+        "model": "Gemini 3.1 Flash Image (Nano Banana 2)",
+        "provider": "Google Gemini",
+    }
+
+
+def generate_ovh_image(payload):
+    # OVHcloud permits anonymous inference with a limit of 2 requests/minute/model/IP.
+    # An access token is optional and raises the documented rate limit.
+    endpoint = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/images/generations"
+    headers = {"Content-Type": "application/json"}
+    token = os.getenv("OVH_AI_ENDPOINTS_ACCESS_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    response = requests.post(
+        endpoint,
+        headers=headers,
+        json={
+            "model": "stable-diffusion-xl-base-v10",
+            "prompt": payload.prompt.strip(),
+            "n": 1,
+            "size": "1024x1024",
+        },
+        timeout=180,
+    )
+    response.raise_for_status()
+    data = response.json()
+    items = data.get("data") or []
+    image_base64 = items[0].get("b64_json") if items and isinstance(items[0], dict) else None
+    if not image_base64:
+        raise RuntimeError("OVHcloud returned no image data")
+    return {
+        "image": "data:image/png;base64," + image_base64,
+        "model": "Stable Diffusion XL",
+        "provider": "OVHcloud AI Endpoints",
+    }
+
+
+def generate_pollinations_image(payload):
+    api_key = os.getenv("POLLINATIONS_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("POLLINATIONS_API_KEY is not configured")
+    from urllib.parse import quote
+    prompt = quote(payload.prompt.strip(), safe="")
+    endpoint = "https://gen.pollinations.ai/image/" + prompt
+    response = requests.get(
+        endpoint,
+        params={"model": "black-forest-labs/flux.1-schnell"},
+        headers={"Authorization": "Bearer " + api_key},
+        timeout=180,
+    )
+    response.raise_for_status()
+    content_type = response.headers.get("Content-Type", "image/jpeg").split(";")[0]
+    if not content_type.startswith("image/"):
+        raise RuntimeError("Pollinations returned a non-image response")
+    return {
+        "image": image_data_uri(response.content, content_type),
+        "model": "FLUX.1 schnell",
+        "provider": "Pollinations",
+    }
+
+
+def generate_cloudflare_image(payload):
+    account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+    if not account_id or not api_token:
+        raise RuntimeError("Cloudflare Workers AI credentials are not configured")
+    prompt = payload.prompt.strip()
+    if len(prompt) > 2048:
+        raise ValueError("FLUX.1 schnell accepts prompts up to 2048 characters")
+    endpoint = (
+        "https://api.cloudflare.com/client/v4/accounts/"
+        + account_id
+        + "/ai/run/@cf/black-forest-labs/flux-1-schnell"
+    )
+    response = requests.post(
+        endpoint,
+        headers={
+            "Authorization": "Bearer " + api_token,
+            "Content-Type": "application/json",
+        },
+        json={"prompt": prompt, "steps": 4 if payload.quality == "speed" else 8},
+        timeout=180,
+    )
+    response.raise_for_status()
+    data = response.json()
+    result = data.get("result") or {}
+    image_base64 = result.get("image") if isinstance(result, dict) else None
+    if not image_base64:
+        raise RuntimeError("Cloudflare returned no generated image")
+    return {
+        "image": "data:image/jpeg;charset=utf-8;base64," + image_base64,
+        "model": "FLUX.1 schnell",
+        "provider": "Cloudflare Workers AI",
+    }
+
+
+IMAGE_PROVIDERS = {
+    "gemini": generate_gemini_image,
+    "ovh": generate_ovh_image,
+    "pollinations": generate_pollinations_image,
+    "cloudflare": generate_cloudflare_image,
+}
 
 
 # Authentication and support API
@@ -329,17 +401,52 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
         raise HTTPException(status_code=401, detail="الحساب غير موجود")
     return user
 
+@app.post("/api/images/edit")
+async def edit_image(payload: ImageEditRequest, user=Depends(current_user)):
+    try:
+        image_bytes = base64.b64decode(payload.image_base64, validate=True)
+        if len(image_bytes) > 12 * 1024 * 1024:
+            raise ValueError("حجم الصورة يتجاوز الحد المسموح (12 MB).")
+        result_image = await run_in_threadpool(
+            call_gemini_image,
+            [
+                {"text": payload.prompt.strip()},
+                {"inline_data": {
+                    "mime_type": payload.mime_type,
+                    "data": base64.b64encode(image_bytes).decode("ascii"),
+                }},
+            ],
+        )
+        logger.info("Google Gemini image edited for user %s", user["id"])
+        return {
+            "image": result_image,
+            "model": "Gemini 3.1 Flash Image (Nano Banana 2)",
+            "provider": "Google Gemini",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Gemini image editing failed")
+        raise HTTPException(
+            status_code=502,
+            detail="تعذر تعديل الصورة عبر Google Gemini: " + type(exc).__name__ + ". تحقق من المفتاح وحصة الاستخدام وسجلات Render.",
+        )
+
+
 @app.post("/api/images/generate")
 async def generate_image(payload: ImageGenerateRequest, user=Depends(current_user)):
     try:
-        result = await run_in_threadpool(generate_qwen_image, payload)
-        logger.info("Qwen image generated for user %s", user["id"])
+        provider = IMAGE_PROVIDERS[payload.provider]
+        result = await run_in_threadpool(provider, payload)
+        logger.info("%s image generated for user %s", result["provider"], user["id"])
         return result
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
-        logger.exception("Qwen Image 2.1 generation failed")
+        logger.exception("%s image generation failed", payload.provider)
         raise HTTPException(
             status_code=502,
-            detail="فشل اتصال Qwen: " + type(exc).__name__ + ". راجع سجلات Render لمعرفة السبب التفصيلي.",
+            detail="تعذر توليد الصورة عبر المزود المختار (" + payload.provider + "): " + type(exc).__name__ + ". تحقق من إعداد المزود وسجلات Render.",
         )
 
 def require_admin(user=Depends(current_user)):

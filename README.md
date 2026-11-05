@@ -2,6 +2,16 @@
 
 A responsive Arabic/English toolbox website built with HTML, CSS and vanilla JavaScript.
 
+## Image generation providers
+
+The image generator supports three server-side providers:
+
+- **OVHcloud AI Endpoints (default):** Stable Diffusion XL. Anonymous requests are supported with a limit of 2 requests per minute per model and source IP. An optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` raises the documented limit; OVHcloud account keys require a Public Cloud project with a payment method.
+- **Pollinations:** FLUX.1 schnell. Requires the secret `POLLINATIONS_API_KEY` from https://enter.pollinations.ai. Keep this key on the backend only.
+- **Cloudflare Workers AI:** FLUX.1 schnell. Requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+
+Set optional credentials in Render → Environment. The user selects the provider in the image generator. OVHcloud's anonymous rate limit is shared by requests from the same server IP, so it is suitable for limited testing, not unlimited production use.
+
 ## Included browser tools
 1. Word counter
 2. Case converter
@@ -82,3 +92,21 @@ API routes:
 - `GET /api/video/status/{project_id}` — checks the job and returns the output URL.
 
 The model is `Lightricks/LTX-Video` hosted in the public `Lightricks/ltx-video-distilled` Space. Public demo capacity is shared; it is suitable for testing, not guaranteed production availability. Generation may fail when the Space is paused or overloaded.
+
+
+## Image generation and editing
+
+SmartHub includes two separate Google Gemini image tools:
+- `image-generator.html`: text-to-image generation. Google Gemini (Nano Banana 2 / `gemini-3.1-flash-image`) is the default provider; OVHcloud, Pollinations, and Cloudflare remain optional alternatives.
+- `image-editor.html`: upload a PNG, JPEG, or WebP image and describe edits in natural language. The image and prompt are sent to the backend for Gemini image editing.
+
+Configure `GEMINI_API_KEY` in the Render API service environment. The key is read only by FastAPI and is never exposed to browser JavaScript. Both image endpoints require an authenticated SmartHub user:
+- `POST /api/images/generate`
+- `POST /api/images/edit`
+
+The editor accepts images up to 12 MB. Gemini API usage is subject to the model's current pricing, quotas, and regional availability; do not assume unlimited or free image generation. See the official [Gemini image generation and editing guide](https://ai.google.dev/gemini-api/docs/image-generation).
+
+Optional alternative providers:
+- OVHcloud: public anonymous inference has rate limits; an optional `OVH_AI_ENDPOINTS_ACCESS_TOKEN` can be configured.
+- Pollinations: requires `POLLINATIONS_API_KEY`.
+- Cloudflare Workers AI: requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; free Neurons are quota-limited, not unlimited.
