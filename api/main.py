@@ -482,7 +482,8 @@ def upload_image_link(payload: ImageUploadRequest, request: Request, user=Depend
     try:
         with db_connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM image_assets WHERE expires_at < NOW()")
+                cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(user["id"]),))
+                cur.execute("DELETE FROM image_assets WHERE user_id=%s AND expires_at < NOW()", (str(user["id"]),))
                 cur.execute(
                     "SELECT COUNT(*) AS total, COALESCE(SUM(octet_length(data)),0) AS used_bytes FROM image_assets WHERE user_id=%s AND expires_at>NOW()",
                     (str(user["id"]),),
@@ -520,7 +521,7 @@ def get_shared_image(asset_id: str):
         raise HTTPException(status_code=404, detail="الرابط غير موجود أو انتهت صلاحيته.")
     return Response(content=bytes(asset["data"]), media_type=asset["content_type"],
                     headers={"Content-Disposition": "inline; filename=shared-image",
-                             "Cache-Control": "public, max-age=3600",
+                             "Cache-Control": "no-store",
                              "X-Content-Type-Options": "nosniff"})
 
 
