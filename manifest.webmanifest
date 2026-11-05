@@ -1,0 +1,21 @@
+{
+  "name": "SmartHub AI",
+  "short_name": "SmartHub",
+  "description": "أدوات الذكاء الاصطناعي والإنتاجية في مكان واحد",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#061b3b",
+  "theme_color": "#061b3b",
+  "icons": [
+    {
+      "src": "icons/smarthub-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
