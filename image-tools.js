@@ -1,6 +1,6 @@
 (() => {
  const $=id=>document.getElementById(id),fileInput=$("imageFile"),canvas=$("preview"),ctx=canvas.getContext("2d",{willReadFrequently:true});
- let source=null,sourceUrl=null,outputBlob=null;
+ let source=null,sourceUrl=null,outputBlob=null,loadSequence=0;
  const MAX_OUTPUT_PIXELS=24000000;
  const say=(id,msg)=>$(id).textContent=msg;
  const bytes=n=>n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(2)+" MB";
@@ -23,12 +23,15 @@
  $("width").addEventListener("input",()=>{if(source&&$("keepRatio").checked){const r=cropRect();$("height").value=Math.max(1,Math.round((Number($("width").value)||r.w)*r.h/r.w));}});
  $("height").addEventListener("input",()=>{if(source&&$("keepRatio").checked){const r=cropRect();$("width").value=Math.max(1,Math.round((Number($("height").value)||r.h)*r.w/r.h));}});
  fileInput.addEventListener("change",()=>{
-  const file=fileInput.files&&fileInput.files[0];if(!file)return;
-  if(!file.type.startsWith("image/")){say("fileInfo","الملف المحدد ليس صورة.");return;}
-  if(file.size>25*1024*1024){say("fileInfo","حجم الصورة يتجاوز 25 ميغابايت لتجنب استهلاك ذاكرة المتصفح.");return;}
-  if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=URL.createObjectURL(file);source=new Image();
-  source.onload=()=>{if(source.naturalWidth*source.naturalHeight>MAX_OUTPUT_PIXELS){say("fileInfo","أبعاد الصورة تتجاوز 24 ميغابكسل؛ اختر صورة أصغر.");source=null;return;}["cropX","cropY"].forEach(id=>$(id).value=0);["cropW","cropH"].forEach(id=>$(id).value=100);updateDimensions();$("process").disabled=false;$("download").disabled=true;outputBlob=null;say("fileInfo",file.name+" — "+source.naturalWidth+" × "+source.naturalHeight+" — "+bytes(file.size));render();};
-  source.onerror=()=>say("fileInfo","تعذر فتح الصورة.");source.src=sourceUrl;
+  const sequence=++loadSequence,file=fileInput.files&&fileInput.files[0];
+  if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=null;source=null;outputBlob=null;
+  $("process").disabled=true;$("download").disabled=true;canvas.hidden=true;say("resultInfo","");
+  if(!file){say("fileInfo","");return;}
+  if(!file.type.startsWith("image/")){fileInput.value="";say("fileInfo","الملف المحدد ليس صورة.");return;}
+  if(file.size>25*1024*1024){fileInput.value="";say("fileInfo","حجم الصورة يتجاوز 25 ميغابايت لتجنب استهلاك ذاكرة المتصفح.");return;}
+  sourceUrl=URL.createObjectURL(file);const candidate=new Image();
+  candidate.onload=()=>{if(sequence!==loadSequence)return;if(candidate.naturalWidth*candidate.naturalHeight>MAX_OUTPUT_PIXELS){source=null;URL.revokeObjectURL(sourceUrl);sourceUrl=null;fileInput.value="";say("fileInfo","أبعاد الصورة تتجاوز 24 ميغابكسل؛ اختر صورة أصغر.");return;}source=candidate;["cropX","cropY"].forEach(id=>$(id).value=0);["cropW","cropH"].forEach(id=>$(id).value=100);updateDimensions();$("process").disabled=false;$("download").disabled=true;say("fileInfo",file.name+" — "+source.naturalWidth+" × "+source.naturalHeight+" — "+bytes(file.size));render();};
+  candidate.onerror=()=>{if(sequence!==loadSequence)return;source=null;fileInput.value="";say("fileInfo","تعذر فتح الصورة.");};candidate.src=sourceUrl;
  });
  function render(){
   if(!source)return;
@@ -59,5 +62,5 @@
   canvas.toBlob(blob=>{if(!blob){say("resultInfo","تعذر تصدير الصورة بهذه الصيغة؛ جرّب PNG أو JPEG.");return;}outputBlob=blob;$("download").disabled=false;say("resultInfo","الحجم الناتج: "+bytes(blob.size)+" — الأبعاد: "+canvas.width+" × "+canvas.height+" — "+blob.type);},type,type==="image/png"?undefined:q);
  });
  $("download").addEventListener("click",()=>{if(!outputBlob)return;const url=URL.createObjectURL(outputBlob),a=document.createElement("a"),ext=outputBlob.type==="image/png"?"png":outputBlob.type==="image/jpeg"?"jpg":"webp";a.href=url;a.download="smarthub-image."+ext;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
- window.addEventListener("pagehide",()=>{if(sourceUrl)URL.revokeObjectURL(sourceUrl);});
+ window.addEventListener("pagehide",()=>{loadSequence++;if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=null;});
 })();
