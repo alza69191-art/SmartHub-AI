@@ -138,6 +138,8 @@ def health():
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "huggingface": bool(os.getenv("HF_TOKEN")),
             "cloudflare_image": bool(os.getenv("CLOUDFLARE_ACCOUNT_ID") and os.getenv("CLOUDFLARE_API_TOKEN")),
+            "ovh_image": True,
+            "pollinations_image": bool(os.getenv("POLLINATIONS_API_KEY")),
             "ltx_video_public": True,
         },
     }
@@ -168,16 +170,72 @@ def chat(payload: ChatRequest):
     )
 
 
-# Image generation through Cloudflare Workers AI (FLUX.1 schnell).
+# Image generation through OVHcloud SDXL, Pollinations FLUX, or Cloudflare FLUX.
 class ImageGenerateRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
-    enhance_prompt: bool = True
+    provider: str = Field(default="ovh", pattern="^(ovh|pollinations|cloudflare)$")
     quality: str = Field(default="speed", pattern="^(speed|quality)$")
-    custom_size: bool = False
-    width: int = Field(default=1024, ge=256, le=2688)
-    height: int = Field(default=1024, ge=256, le=2688)
-    negative_prompt: str = Field(default="", max_length=1500)
-    seed: int = Field(default=0, ge=0, le=2147483647)
+
+
+def image_data_uri(image_bytes, content_type="image/png"):
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return "data:" + content_type + ";base64," + encoded
+
+
+def generate_ovh_image(payload):
+    # OVHcloud permits anonymous inference with a limit of 2 requests/minute/model/IP.
+    # An access token is optional and raises the documented rate limit.
+    endpoint = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/images/generations"
+    headers = {"Content-Type": "application/json"}
+    token = os.getenv("OVH_AI_ENDPOINTS_ACCESS_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    response = requests.post(
+        endpoint,
+        headers=headers,
+        json={
+            "model": "stable-diffusion-xl-base-v10",
+            "prompt": payload.prompt.strip(),
+            "n": 1,
+            "size": "1024x1024",
+        },
+        timeout=180,
+    )
+    response.raise_for_status()
+    data = response.json()
+    items = data.get("data") or []
+    image_base64 = items[0].get("b64_json") if items and isinstance(items[0], dict) else None
+    if not image_base64:
+        raise RuntimeError("OVHcloud returned no image data")
+    return {
+        "image": "data:image/png;base64," + image_base64,
+        "model": "Stable Diffusion XL",
+        "provider": "OVHcloud AI Endpoints",
+    }
+
+
+def generate_pollinations_image(payload):
+    api_key = os.getenv("POLLINATIONS_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("POLLINATIONS_API_KEY is not configured")
+    from urllib.parse import quote
+    prompt = quote(payload.prompt.strip(), safe="")
+    endpoint = "https://gen.pollinations.ai/image/" + prompt
+    response = requests.get(
+        endpoint,
+        params={"model": "black-forest-labs/flux.1-schnell"},
+        headers={"Authorization": "Bearer " + api_key},
+        timeout=180,
+    )
+    response.raise_for_status()
+    content_type = response.headers.get("Content-Type", "image/jpeg").split(";")[0]
+    if not content_type.startswith("image/"):
+        raise RuntimeError("Pollinations returned a non-image response")
+    return {
+        "image": image_data_uri(response.content, content_type),
+        "model": "FLUX.1 schnell",
+        "provider": "Pollinations",
+    }
 
 
 def generate_cloudflare_image(payload):
@@ -185,11 +243,9 @@ def generate_cloudflare_image(payload):
     api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
     if not account_id or not api_token:
         raise RuntimeError("Cloudflare Workers AI credentials are not configured")
-
     prompt = payload.prompt.strip()
     if len(prompt) > 2048:
         raise ValueError("FLUX.1 schnell accepts prompts up to 2048 characters")
-
     endpoint = (
         "https://api.cloudflare.com/client/v4/accounts/"
         + account_id
@@ -210,12 +266,18 @@ def generate_cloudflare_image(payload):
     image_base64 = result.get("image") if isinstance(result, dict) else None
     if not image_base64:
         raise RuntimeError("Cloudflare returned no generated image")
-
     return {
         "image": "data:image/jpeg;charset=utf-8;base64," + image_base64,
         "model": "FLUX.1 schnell",
         "provider": "Cloudflare Workers AI",
     }
+
+
+IMAGE_PROVIDERS = {
+    "ovh": generate_ovh_image,
+    "pollinations": generate_pollinations_image,
+    "cloudflare": generate_cloudflare_image,
+}
 
 
 # Authentication and support API
@@ -295,16 +357,17 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
 @app.post("/api/images/generate")
 async def generate_image(payload: ImageGenerateRequest, user=Depends(current_user)):
     try:
-        result = await run_in_threadpool(generate_cloudflare_image, payload)
-        logger.info("FLUX image generated for user %s", user["id"])
+        provider = IMAGE_PROVIDERS[payload.provider]
+        result = await run_in_threadpool(provider, payload)
+        logger.info("%s image generated for user %s", result["provider"], user["id"])
         return result
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
-        logger.exception("Cloudflare FLUX image generation failed")
+        logger.exception("%s image generation failed", payload.provider)
         raise HTTPException(
             status_code=502,
-            detail="تعذر توليد الصورة عبر FLUX: " + type(exc).__name__ + ". تحقق من إعدادات Cloudflare وسجلات Render.",
+            detail="تعذر توليد الصورة عبر المزود المختار (" + payload.provider + "): " + type(exc).__name__ + ". تحقق من إعداد المزود وسجلات Render.",
         )
 
 def require_admin(user=Depends(current_user)):
