@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 
 class RequestSecurityMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, max_body_bytes=15 * 1024 * 1024):
+    def __init__(self, app, max_body_bytes=18 * 1024 * 1024):
         super().__init__(app)
         self.max_body_bytes = max_body_bytes
         self.events = defaultdict(deque)
