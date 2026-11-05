@@ -6,7 +6,7 @@
   if(!("BarcodeDetector" in window))throw Error("هذا المتصفح لا يدعم قارئ الباركود المدمج. جرّب Chrome أو Edge.");
   const formats=await BarcodeDetector.getSupportedFormats();
   const preferred=["qr_code","code_128","code_39","ean_13","ean_8","upc_a","upc_e","itf","codabar","data_matrix","pdf417","aztec"];
-  detector=new BarcodeDetector({formats:preferred.filter(x=>formats.includes(x))});
+  const supported=preferred.filter(x=>formats.includes(x));if(!supported.length)throw Error("لا توجد صيغ باركود مدعومة في هذا المتصفح.");detector=new BarcodeDetector({formats:supported});
  }
  async function readBitmap(bitmap){
   await makeDetector();
@@ -18,18 +18,19 @@
  $("scanFile").addEventListener("change",async e=>{
   const file=e.target.files?.[0];if(!file)return;
   if(!file.type.startsWith("image/")){say("اختر ملف صورة صالحاً.");return;}
-  try{const bitmap=await createImageBitmap(file);await readBitmap(bitmap);bitmap.close();}
-  catch(err){say(err.message||"تعذرت قراءة الصورة.");}
+  let bitmap;try{bitmap=await createImageBitmap(file);await readBitmap(bitmap);}
+  catch(err){say(err.message||"تعذرت قراءة الصورة.");}finally{if(bitmap)bitmap.close();}
  });
  $("cameraStart").onclick=async()=>{
   try{
    await makeDetector();
+   if(!navigator.mediaDevices?.getUserMedia)throw Error("الكاميرا غير متاحة في هذا المتصفح. استخدم HTTPS ومتصفحاً يدعم الكاميرا.");
    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
    const video=$("camera");video.srcObject=stream;video.hidden=false;await video.play();
    $("cameraStart").disabled=true;$("cameraStop").disabled=false;
    const scan=async()=>{if(!stream)return;try{const found=await detector.detect(video);if(found.length){lastValue=found[0].rawValue||"";say("تمت القراءة: "+lastValue);stop();return;}}catch{}loopId=requestAnimationFrame(scan);};
    scan();
-  }catch(err){say(err.message||"تعذر تشغيل الكاميرا. تحقق من الإذن واستخدم HTTPS.");}
+  }catch(err){stop();say(err.message||"تعذر تشغيل الكاميرا. تحقق من الإذن واستخدم HTTPS.");}
  };
  function stop(){if(loopId)cancelAnimationFrame(loopId);loopId=null;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}const v=$("camera");v.pause();v.srcObject=null;v.hidden=true;$("cameraStart").disabled=false;$("cameraStop").disabled=true;}
  $("cameraStop").onclick=stop;
