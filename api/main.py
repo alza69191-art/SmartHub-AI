@@ -398,6 +398,7 @@ class LoginRequest(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     credential: str = Field(min_length=20, max_length=10000)
+    remember_me: bool = False
 
 class ImageUploadRequest(BaseModel):
     file_name: str = Field(min_length=1, max_length=160)
@@ -662,7 +663,7 @@ def google_login(payload: GoogleLoginRequest):
             with conn.cursor() as cur:
                 cur.execute("UPDATE profiles SET role='user' WHERE id=%s RETURNING id,email,display_name,role,created_at", (str(profile["id"]),))
                 profile = cur.fetchone()
-    return {"token": make_token(profile), "user": profile}
+    return {"token": make_token(profile, payload.remember_me), "user": profile}
 
 
 @app.post("/api/auth/login")
