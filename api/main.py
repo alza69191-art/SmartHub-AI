@@ -496,7 +496,7 @@ def google_login(payload: GoogleLoginRequest):
         subject = str(claims["sub"])
         email = str(claims["email"]).strip().lower()
         display_name = str(claims.get("name") or email.split("@")[0])[:80]
-        if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
             raise ValueError("Invalid email")
     except Exception:
         logger.warning("Google sign-in token verification failed")
