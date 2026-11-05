@@ -313,3 +313,5 @@ main,footer{margin-right:0}
 .minimal-composer textarea::placeholder{color:#888}
 .minimal-composer button{background:#222;border-radius:6px;font-size:14px}
 @media(max-width:600px){.minimal-assistant{padding:10px}.minimal-message{max-width:96%}}
+
+.remember-option{display:flex!important;align-items:center;gap:9px;margin:12px 0!important;color:var(--muted)!important;font-size:12px!important}.remember-option input{width:auto!important;margin:0;accent-color:var(--purple)}
