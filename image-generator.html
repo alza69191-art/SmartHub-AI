@@ -28,9 +28,7 @@
 <main class="generator"><section class="generator-card">
 <small>POWERED BY CLOUDFLARE</small><h1>مولّد الصور FLUX.1 schnell</h1><p class="muted">اكتب وصف الصورة باللغة العربية أو الإنجليزية. يلزم تسجيل الدخول لاستخدام المولّد.</p>
 <label for="prompt">وصف الصورة</label><textarea id="prompt" maxlength="4000" placeholder="صف الصورة التي تريد إنشاءها بالتفصيل..."></textarea>
-<label class="check"><input id="enhance" type="checkbox" checked> تحسين الوصف تلقائياً</label>
-<div class="row"><div><label for="quality">الجودة</label><select id="quality"><option value="speed">سريعة – 4 خطوات</option><option value="quality">أعلى – 8 خطوات</option></select></div><div><label for="seed">البذرة (Seed)</label><input id="seed" type="number" min="0" max="2147483647" value="0"></div></div>
-<label for="negative">ما الذي تريد تجنّبه؟ (اختياري)</label><textarea id="negative" style="min-height:75px" maxlength="1500" placeholder="تشوهات، نصوص غير مرغوبة، علامة مائية..."></textarea>
+<label for="quality">عدد خطوات التوليد</label><select id="quality"><option value="speed">سريعة – 4 خطوات</option><option value="quality">تفاصيل أكثر – 8 خطوات</option></select>
 <button id="generate" type="button">إنشاء الصورة</button><p id="status" role="status"></p>
 <div id="result"><img id="output" alt="الصورة المولدة"><a id="download" download="smarthub-qwen-image.png">تنزيل الصورة</a></div>
 </section></main>
