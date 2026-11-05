@@ -22,11 +22,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from groq import Groq
 from database import initialize_database, database_is_ready
+from security import install_security
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("smarthub")
 
-app = FastAPI(title="SmartHub AI API", version="1.1.0")
+app = FastAPI(title="SmartHub AI API", version="1.2.0")
+install_security(app)
 
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")
 app.add_middleware(
@@ -342,6 +344,9 @@ class LoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=1, max_length=128)
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=20, max_length=10000)
+
 class TicketRequest(BaseModel):
     subject: str = Field(min_length=3, max_length=200)
     message: str = Field(min_length=10, max_length=5000)
@@ -475,6 +480,49 @@ def register(payload: RegisterRequest):
     except psycopg.errors.UniqueViolation:
         raise HTTPException(status_code=409, detail="هذا البريد مسجل مسبقاً")
     return {"token": make_token(profile), "user": profile}
+
+@app.post("/api/auth/google")
+def google_login(payload: GoogleLoginRequest):
+    ensure_auth_config()
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    if not client_id:
+        raise HTTPException(status_code=503, detail="تسجيل Google غير مهيأ على الخادم")
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+        claims = id_token.verify_oauth2_token(payload.credential, google_requests.Request(), client_id, clock_skew_in_seconds=10)
+        if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com") or claims.get("email_verified") is not True:
+            raise ValueError("Untrusted Google identity")
+        subject = str(claims["sub"])
+        email = str(claims["email"]).strip().lower()
+        display_name = str(claims.get("name") or email.split("@")[0])[:80]
+        if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+            raise ValueError("Invalid email")
+    except Exception:
+        logger.warning("Google sign-in token verification failed")
+        raise HTTPException(status_code=401, detail="تعذر التحقق من حساب Google. حاول مجدداً.")
+    try:
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id,email,display_name,role,created_at FROM profiles WHERE auth_subject=%s", ("google:" + subject,))
+                profile = cur.fetchone()
+                if not profile:
+                    cur.execute("SELECT id,email,display_name,role,created_at FROM profiles WHERE LOWER(email)=LOWER(%s)", (email,))
+                    profile = cur.fetchone()
+                if profile:
+                    cur.execute("""UPDATE profiles SET auth_subject=%s,email=%s,
+                                   display_name=COALESCE(NULLIF(display_name,''),%s)
+                                   WHERE id=%s RETURNING id,email,display_name,role,created_at""",
+                                ("google:" + subject,email,display_name,str(profile["id"])))
+                else:
+                    cur.execute("""INSERT INTO profiles (id,auth_subject,email,display_name,role)
+                                   VALUES (%s,%s,%s,%s,'user') RETURNING id,email,display_name,role,created_at""",
+                                (str(uuid.uuid4()),"google:" + subject,email,display_name))
+                profile = cur.fetchone()
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(status_code=409, detail="هذا الحساب مرتبط مسبقاً بحساب آخر")
+    return {"token": make_token(profile), "user": profile}
+
 
 @app.post("/api/auth/login")
 def login(payload: LoginRequest):
