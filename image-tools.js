@@ -31,7 +31,7 @@
   if(file.size>25*1024*1024){fileInput.value="";say("fileInfo","حجم الصورة يتجاوز 25 ميغابايت لتجنب استهلاك ذاكرة المتصفح.");return;}
   sourceUrl=URL.createObjectURL(file);const candidate=new Image();
   candidate.onload=()=>{if(sequence!==loadSequence)return;if(candidate.naturalWidth*candidate.naturalHeight>MAX_OUTPUT_PIXELS){source=null;URL.revokeObjectURL(sourceUrl);sourceUrl=null;fileInput.value="";say("fileInfo","أبعاد الصورة تتجاوز 24 ميغابكسل؛ اختر صورة أصغر.");return;}source=candidate;["cropX","cropY"].forEach(id=>$(id).value=0);["cropW","cropH"].forEach(id=>$(id).value=100);updateDimensions();$("process").disabled=false;$("download").disabled=true;say("fileInfo",file.name+" — "+source.naturalWidth+" × "+source.naturalHeight+" — "+bytes(file.size));render();};
-  candidate.onerror=()=>{if(sequence!==loadSequence)return;source=null;fileInput.value="";say("fileInfo","تعذر فتح الصورة.");};candidate.src=sourceUrl;
+  candidate.onerror=()=>{if(sequence!==loadSequence)return;source=null;if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=null;fileInput.value="";say("fileInfo","تعذر فتح الصورة.");};candidate.src=sourceUrl;
  });
  function render(){
   if(!source)return;
