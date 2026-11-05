@@ -69,14 +69,13 @@ jobs:
           AAB="$(find android/app/build/outputs/bundle/release -name '*.aab' -print -quit)"
           test -n "$APK"
           test -n "$AAB"
-          jarsigner -keystore "$RUNNER_TEMP/smarthub-release.jks" -storepass:env ANDROID_KEYSTORE_PASSWORD -keypass:env ANDROID_KEY_PASSWORD -signedjar signed/SmartHub-AI-release-unsigned-alias.apk "$APK" "$ANDROID_KEY_ALIAS"
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
-          "$APKSIGNER" sign --ks "$RUNNER_TEMP/smarthub-release.jks" --ks-key-alias "$ANDROID_KEY_ALIAS" --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD --out signed/SmartHub-AI-release.apk signed/SmartHub-AI-release-unsigned-alias.apk
+                    APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          "$APKSIGNER" sign --ks "$RUNNER_TEMP/smarthub-release.jks" --ks-key-alias "$ANDROID_KEY_ALIAS" --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD --out signed/SmartHub-AI-release.apk "$APK"
           jarsigner -keystore "$RUNNER_TEMP/smarthub-release.jks" -storepass:env ANDROID_KEYSTORE_PASSWORD -keypass:env ANDROID_KEY_PASSWORD "$AAB" "$ANDROID_KEY_ALIAS"
           cp "$AAB" signed/SmartHub-AI-release.aab
           "$APKSIGNER" verify --verbose signed/SmartHub-AI-release.apk
           jarsigner -verify signed/SmartHub-AI-release.aab
-          rm -f "$RUNNER_TEMP/smarthub-release.jks" signed/SmartHub-AI-release-unsigned-alias.apk
+          rm -f "$RUNNER_TEMP/smarthub-release.jks"
 
       - name: Upload signed Android release
         uses: actions/upload-artifact@v4
