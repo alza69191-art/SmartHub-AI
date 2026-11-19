@@ -4,4 +4,4 @@ groq==1.7.0
 requests==2.34.2
 psycopg[binary]==3.3.8
 PyJWT==2.15.1
-google-auth==2.62.1
+google-auth==2.62.2
